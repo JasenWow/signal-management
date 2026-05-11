@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { useMessageStore } from '../../stores/messageStore'
-import type { ByteOrder } from '@shared/types'
 
 export function MessageEditor() {
-  const { createMessage, updateMessage, deleteMessage, activeMessageId, messages } = useMessageStore()
+  const { activeMessage, activeMessageId, createMessage, updateMessage, deleteMessage, importSpec } = useMessageStore()
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [frameSize, setFrameSize] = useState(8)
-
-  const activeMessage = messages.find((m) => m.id === activeMessageId)
+  const [localName, setLocalName] = useState<string | null>(null)
+  const [localFrameSize, setLocalFrameSize] = useState<string | null>(null)
 
   async function handleCreate() {
     if (!name.trim()) return
@@ -25,16 +24,80 @@ export function MessageEditor() {
     await deleteMessage(activeMessageId)
   }
 
+  function handleExport() {
+    if (!activeMessage) return
+    const signals = useMessageStore.getState().activeSignals
+    const exportData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      message: {
+        name: activeMessage.name,
+        description: activeMessage.description,
+        frameSize: activeMessage.frameSize,
+        byteOrder: activeMessage.byteOrder,
+      },
+      signals: signals.map(s => ({
+        name: s.name,
+        description: s.description,
+        startBit: s.startBit,
+        bitLength: s.bitLength,
+        byteOrder: s.byteOrder,
+        factor: s.factor,
+        offset: s.offset,
+        unit: s.unit,
+        minimum: s.minimum,
+        maximum: s.maximum,
+        color: s.color,
+        sortOrder: s.sortOrder,
+      })),
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${activeMessage.name || 'message-spec'}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleImport() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        const data = JSON.parse(text)
+        if (!data.message || !data.signals) {
+          alert('Invalid spec file')
+          return
+        }
+        await importSpec(data)
+      } catch {
+        alert('Failed to import spec file')
+      }
+    }
+    input.click()
+  }
+
+  const displayName = localName ?? activeMessage?.name ?? ''
+  const displayFrameSize = localFrameSize ?? String(activeMessage?.frameSize ?? 8)
+
   return (
     <>
       {activeMessage && (
         <div className="flex items-center gap-2 ml-auto">
           <input
             className="border rounded px-2 py-1 text-sm w-28"
-            value={activeMessage.name}
-            onBlur={(e) => {
-              if (e.target.value.trim() && e.target.value !== activeMessage.name) {
-                updateMessage(activeMessage.id, { name: e.target.value.trim() })
+            value={displayName}
+            onChange={(e) => setLocalName(e.target.value)}
+            onFocus={() => setLocalName(activeMessage.name)}
+            onBlur={() => {
+              setLocalName(null)
+              if (displayName.trim() && displayName !== activeMessage.name) {
+                updateMessage(activeMessage.id, { name: displayName.trim() })
               }
             }}
             onKeyDown={(e) => {
@@ -46,9 +109,12 @@ export function MessageEditor() {
             <input
               type="number" min={1} max={64}
               className="border rounded px-1.5 py-1 text-sm w-14 font-mono"
-              value={activeMessage.frameSize}
-              onBlur={(e) => {
-                const v = Number(e.target.value)
+              value={displayFrameSize}
+              onChange={(e) => setLocalFrameSize(e.target.value)}
+              onFocus={() => setLocalFrameSize(String(activeMessage.frameSize))}
+              onBlur={() => {
+                const v = Number(displayFrameSize)
+                setLocalFrameSize(null)
                 if (v > 0 && v !== activeMessage.frameSize) {
                   updateMessage(activeMessage.id, { frameSize: v })
                 }
@@ -58,12 +124,21 @@ export function MessageEditor() {
               }}
             />
           </div>
+          <button className="text-xs px-1.5 py-1 text-gray-500 hover:bg-gray-100 rounded" onClick={handleExport} title="Export spec">
+            Export
+          </button>
           <button className="text-red-400 text-xs px-1.5 py-1 hover:bg-red-50 rounded" onClick={handleDelete}>
             Delete
           </button>
         </div>
       )}
 
+      <button
+        className="px-2.5 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 shrink-0"
+        onClick={handleImport}
+      >
+        Import
+      </button>
       <button
         className="px-2.5 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 shrink-0"
         onClick={() => setShowCreate(true)}

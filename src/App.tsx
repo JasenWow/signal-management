@@ -8,7 +8,7 @@ import { BitCanvas } from './components/BitCanvas/BitCanvas'
 import { VersionPanel } from './components/VersionPanel/VersionPanel'
 
 export default function App() {
-  const { messages, activeMessageId, loadMessages, selectMessage, addSignal, pendingSelection } = useMessageStore()
+  const { messages, activeMessageId, activeMessage, loadMessages, selectMessage, addSignal } = useMessageStore()
   const { loadVersions } = useVersionStore()
   const [signalFormMode, setSignalFormMode] = useState<'closed' | 'create' | 'edit'>('closed')
 
@@ -35,8 +35,6 @@ export default function App() {
     setSignalFormMode('closed')
     useMessageStore.getState().setPendingSelection(null)
   }
-
-  const activeMessage = messages.find((m) => m.id === activeMessageId)
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 text-gray-900">

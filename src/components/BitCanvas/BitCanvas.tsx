@@ -3,14 +3,22 @@ import { useMessageStore } from '../../stores/messageStore'
 import { useCanvasSelection } from '../../hooks/useCanvasSelection'
 import { SignalOverlay } from './SignalOverlay'
 import { DEFAULT_CELL_SIZE } from '@shared/constants'
+import type { BitNumbering } from '@shared/types'
 
 interface BitCanvasProps {
   onBitSelection: (startBit: number, bitLength: number) => void
 }
 
+function getBitLabel(_byteIndex: number, bitInByte: number, numbering: BitNumbering): string {
+  if (numbering === 'msb0') {
+    return String(7 - bitInByte)
+  }
+  return String(bitInByte)
+}
+
 export function BitCanvas({ onBitSelection }: BitCanvasProps) {
-  const { activeMessageId, activeSignals, selectedSignalId, messages } = useMessageStore()
-  const message = messages.find((m) => m.id === activeMessageId)
+  const { activeMessage, activeSignals, selectedSignalId, bitNumbering, setBitNumbering } = useMessageStore()
+  const message = activeMessage
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoveredBit, setHoveredBit] = useState<number | null>(null)
   const [dragPreview, setDragPreview] = useState<{ startBit: number; bitLength: number } | null>(null)
@@ -65,11 +73,30 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
 
   return (
     <div className="flex flex-col items-center select-none">
+      {/* Controls */}
+      <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-gray-400">Bit numbering:</span>
+          <button
+            className={`px-1.5 py-0.5 rounded text-xs font-mono ${bitNumbering === 'msb0' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            onClick={() => setBitNumbering('msb0')}
+          >
+            MSB0
+          </button>
+          <button
+            className={`px-1.5 py-0.5 rounded text-xs font-mono ${bitNumbering === 'lsb0' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            onClick={() => setBitNumbering('lsb0')}
+          >
+            LSB0
+          </button>
+        </div>
+      </div>
+
       {/* Bit column headers */}
-      <div className="flex mb-1" style={{ paddingLeft: 40 }}>
+      <div className="flex" style={{ paddingLeft: 24 }}>
         {Array.from({ length: 8 }, (_, i) => (
           <div key={i} className="text-xs text-gray-400 text-center font-mono" style={{ width: cellSize }}>
-            {7 - i}
+            {getBitLabel(0, i, bitNumbering)}
           </div>
         ))}
       </div>
@@ -80,8 +107,8 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
           {Array.from({ length: frameSize }, (_, byteIdx) => (
             <div
               key={byteIdx}
-              className="text-xs text-gray-400 text-right pr-2 flex items-center justify-end font-mono"
-              style={{ height: cellSize, width: 36 }}
+              className="text-xs text-gray-500 text-right pr-2 flex items-center justify-end font-mono font-semibold"
+              style={{ height: cellSize, width: 20 }}
             >
               {byteIdx}
             </div>
@@ -178,10 +205,10 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
               textAnchor="middle"
               dominantBaseline="central"
               fontSize={10}
-              fill="#9ca3af"
+              fill="#6b7280"
               style={{ pointerEvents: 'none' }}
             >
-              {hoveredBit}
+              B{Math.floor(hoveredBit / 8)}:{getBitLabel(Math.floor(hoveredBit / 8), hoveredBit % 8, bitNumbering)}
             </text>
           )}
         </svg>
@@ -190,9 +217,9 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
       {/* Status bar */}
       <div className="text-xs text-gray-400 mt-2 h-5">
         {dragPreview
-          ? `Selected: bit ${dragPreview.startBit} - ${dragPreview.startBit + dragPreview.bitLength - 1} (${dragPreview.bitLength} bits) — release to define signal`
+          ? `Selected: B${Math.floor(dragPreview.startBit / 8)}:${getBitLabel(Math.floor(dragPreview.startBit / 8), dragPreview.startBit % 8, bitNumbering)} — B${Math.floor((dragPreview.startBit + dragPreview.bitLength - 1) / 8)}:${getBitLabel(Math.floor((dragPreview.startBit + dragPreview.bitLength - 1) / 8), (dragPreview.startBit + dragPreview.bitLength - 1) % 8, bitNumbering)} (${dragPreview.bitLength} bits)`
           : hoveredBit !== null
-            ? `Byte ${Math.floor(hoveredBit / 8)}, Bit ${7 - (hoveredBit % 8)} (abs: ${hoveredBit})`
+            ? `Byte ${Math.floor(hoveredBit / 8)}, Bit ${getBitLabel(Math.floor(hoveredBit / 8), hoveredBit % 8, bitNumbering)} (abs: ${hoveredBit})`
             : 'Click and drag to select a bit region for a new signal'
         }
       </div>

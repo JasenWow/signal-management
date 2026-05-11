@@ -4,8 +4,10 @@ export const MAX_FRAME_SIZE = 64
 
 export const DEFAULT_CELL_SIZE = 36
 export const DEFAULT_SIGNAL_COLORS = [
-  '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
-  '#8B5CF6', '#EC4899', '#14B8A6', '#F97316',
+  '#2563EB', '#059669', '#D97706', '#DC2626',
+  '#7C3AED', '#DB2777', '#0891B2', '#EA580C',
+  '#4F46E5', '#15803D', '#B45309', '#BE123C',
+  '#6D28D9', '#9333EA', '#0E7490', '#C2410C',
 ]
 
 export const SIGNAL_DATA_TYPES = ['unsigned', 'signed', 'float', 'boolean'] as const

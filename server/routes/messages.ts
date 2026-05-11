@@ -82,5 +82,44 @@ export default function messageRoutes(db: Database.Database) {
     return c.json({ success: true })
   })
 
+  app.post('/import', async (c) => {
+    const body = await c.req.json<{
+      message: { name: string; description?: string; frameSize: number; byteOrder?: string };
+      signals: Array<{
+        name: string; description?: string; startBit: number; bitLength: number;
+        byteOrder?: string; factor?: number; offset?: number; unit?: string;
+        minimum?: number | null; maximum?: number | null; color?: string; sortOrder?: number;
+      }>;
+    }>()
+
+    const messageId = randomUUID()
+    const now = new Date().toISOString()
+
+    db.prepare(
+      `INSERT INTO messages (id, name, description, frame_size, byte_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(messageId, body.message.name, body.message.description ?? '', body.message.frameSize, body.message.byteOrder ?? 'big', now, now)
+
+    const signalInsert = db.prepare(
+      `INSERT INTO signals (id, message_id, name, description, start_bit, bit_length, byte_order,
+         factor, offset, unit, minimum, maximum, value_table_id, color, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+
+    for (let i = 0; i < body.signals.length; i++) {
+      const s = body.signals[i]
+      signalInsert.run(
+        randomUUID(), messageId, s.name, s.description ?? '', s.startBit, s.bitLength,
+        s.byteOrder ?? 'big', s.factor ?? 1.0, s.offset ?? 0.0, s.unit ?? '',
+        s.minimum ?? null, s.maximum ?? null, null,
+        s.color ?? '#10B981', s.sortOrder ?? i, now, now
+      )
+    }
+
+    const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) as DbRow
+    const signalRows = db.prepare('SELECT * FROM signals WHERE message_id = ? ORDER BY start_bit').all(messageId) as DbRow[]
+    return c.json({ ...mapMessage(row), signals: signalRows.map(mapSignal) }, 201)
+  })
+
   return app
 }

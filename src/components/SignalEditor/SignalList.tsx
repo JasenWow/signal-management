@@ -1,11 +1,19 @@
 import { useMessageStore } from '../../stores/messageStore'
+import type { BitNumbering } from '@shared/types'
+
+function bitPosLabel(absBit: number, numbering: BitNumbering): string {
+  const byteIdx = Math.floor(absBit / 8)
+  const bitInByte = absBit % 8
+  const bitLabel = numbering === 'msb0' ? String(7 - bitInByte) : String(bitInByte)
+  return `B${byteIdx}:${bitLabel}`
+}
 
 interface SignalListProps {
   onEdit: () => void
 }
 
 export function SignalList({ onEdit }: SignalListProps) {
-  const { activeMessageId, activeSignals, selectedSignalId, setSelectedSignal, deleteSignal } = useMessageStore()
+  const { activeMessageId, activeSignals, selectedSignalId, setSelectedSignal, deleteSignal, bitNumbering } = useMessageStore()
 
   if (!activeMessageId) {
     return <div className="p-3 text-sm text-gray-400">Select a message first</div>
@@ -33,7 +41,7 @@ export function SignalList({ onEdit }: SignalListProps) {
           <div className="flex-1 min-w-0">
             <div className="font-medium truncate text-xs">{signal.name}</div>
             <div className="text-[10px] text-gray-400 font-mono">
-              bit {signal.startBit}-{signal.startBit + signal.bitLength - 1} ({signal.bitLength}b)
+              {bitPosLabel(signal.startBit, bitNumbering)} — {bitPosLabel(signal.startBit + signal.bitLength - 1, bitNumbering)} ({signal.bitLength}b)
               {signal.unit ? ` · ${signal.unit}` : ''}
             </div>
           </div>

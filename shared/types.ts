@@ -1,5 +1,6 @@
 export type ByteOrder = 'big' | 'little'
 export type SignalDataType = 'unsigned' | 'signed' | 'float' | 'boolean'
+export type BitNumbering = 'msb0' | 'lsb0'
 
 export interface Message {
   id: string
