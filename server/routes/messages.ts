@@ -1,26 +1,46 @@
 import { Hono } from 'hono'
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'crypto'
-import type { CreateMessageInput, UpdateMessageInput } from '../../shared/types.js'
+import type { CreateMessageInput, UpdateMessageInput, Message, Signal, Tag } from '../../shared/types.js'
 
 interface DbRow { [key: string]: unknown }
 
-function mapMessage(r: DbRow) {
+function mapMessage(r: DbRow): Message {
   return {
-    id: r.id, name: r.name, description: r.description,
-    frameSize: r.frame_size, byteOrder: r.byte_order,
-    createdAt: r.created_at, updatedAt: r.updated_at,
+    id: r.id as string, name: r.name as string, description: r.description as string,
+    frameSize: r.frame_size as number, byteOrder: r.byte_order as Message['byteOrder'],
+    createdAt: r.created_at as string, updatedAt: r.updated_at as string,
   }
 }
 
-function mapSignal(r: DbRow) {
+function mapTag(r: DbRow): Tag {
+  return { id: r.id as string, name: r.name as string, color: r.color as string, createdAt: r.created_at as string, updatedAt: r.updated_at as string }
+}
+
+function getSignalTags(db: Database.Database, signalId: string): Tag[] {
+  return (db.prepare(
+    `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
+     FROM tags t JOIN signal_tags st ON t.id = st.tag_id
+     WHERE st.signal_id = ?`
+  ).all(signalId) as DbRow[]).map(mapTag)
+}
+
+function getMessageTags(db: Database.Database, messageId: string): Tag[] {
+  return (db.prepare(
+    `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
+     FROM tags t JOIN message_tags mt ON t.id = mt.tag_id
+     WHERE mt.message_id = ?`
+  ).all(messageId) as DbRow[]).map(mapTag)
+}
+
+function mapSignal(r: DbRow): Signal {
   return {
-    id: r.id, messageId: r.message_id, name: r.name, description: r.description,
-    startBit: r.start_bit, bitLength: r.bit_length, byteOrder: r.byte_order,
-    factor: r.factor, offset: r.offset, unit: r.unit,
-    minimum: r.minimum, maximum: r.maximum, valueTableId: r.value_table_id,
-    color: r.color, sortOrder: r.sort_order,
-    createdAt: r.created_at, updatedAt: r.updated_at,
+    id: r.id as string, messageId: r.message_id as string, name: r.name as string, description: r.description as string,
+    startBit: r.start_bit as number, bitLength: r.bit_length as number, byteOrder: r.byte_order as Signal['byteOrder'],
+    factor: r.factor as number, offset: r.offset as number, unit: r.unit as string,
+    minimum: r.minimum as number | null, maximum: r.maximum as number | null, valueTableId: r.value_table_id as string | null,
+    dataType: r.data_type as Signal['dataType'], color: r.color as string, sortOrder: r.sort_order as number,
+    createdAt: r.created_at as string, updatedAt: r.updated_at as string,
   }
 }
 
@@ -29,7 +49,11 @@ export default function messageRoutes(db: Database.Database) {
 
   app.get('/', (c) => {
     const rows = db.prepare('SELECT * FROM messages ORDER BY sort_order, created_at DESC').all() as DbRow[]
-    return c.json(rows.map(mapMessage))
+    const messagesWithTags = rows.map((r) => {
+      const msg = mapMessage(r)
+      return { ...msg, tags: getMessageTags(db, msg.id) }
+    })
+    return c.json(messagesWithTags)
   })
 
   app.get('/:id', (c) => {
@@ -38,7 +62,11 @@ export default function messageRoutes(db: Database.Database) {
     if (!row) return c.json({ error: 'Message not found' }, 404)
 
     const signalRows = db.prepare('SELECT * FROM signals WHERE message_id = ? ORDER BY start_bit').all(id) as DbRow[]
-    return c.json({ ...mapMessage(row), signals: signalRows.map(mapSignal) })
+    const signalsWithTags = signalRows.map((r) => {
+      const signal = mapSignal(r)
+      return { ...signal, tags: getSignalTags(db, signal.id) }
+    })
+    return c.json({ ...mapMessage(row), signals: signalsWithTags, tags: getMessageTags(db, id) })
   })
 
   app.post('/', async (c) => {

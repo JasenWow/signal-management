@@ -45,7 +45,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
   selectMessage: async (id: string) => {
     if (!id) {
       console.trace('[DEBUG] selectMessage called with empty id — resetting activeMessageId')
-      set({ activeMessageId: null, activeMessage: null, activeSignals: [], selectedSignalId: null })
+      set({ activeMessageId: null, activeMessage: null, activeSignals: [], selectedSignalId: null, pendingSelection: null })
       return
     }
     const res = await fetch(`/api/messages/${id}`)
@@ -56,6 +56,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
       activeMessage: messageData as Message,
       activeSignals: signals ?? [],
       selectedSignalId: null,
+      pendingSelection: null,
     })
   },
 

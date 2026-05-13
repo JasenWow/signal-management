@@ -1,13 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMessageStore } from '../../stores/messageStore'
+import { TagInput } from '../TagInput/TagInput'
+import { useTagStore } from '../../stores/tagStore'
+import type { Tag } from '@shared/types'
 
 export function MessageEditor() {
   const { activeMessage, activeMessageId, createMessage, updateMessage, deleteMessage, importSpec } = useMessageStore()
+  const { assignTagsToMessage, removeTagFromMessage } = useTagStore()
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [frameSize, setFrameSize] = useState(8)
   const [localName, setLocalName] = useState<string | null>(null)
   const [localFrameSize, setLocalFrameSize] = useState<string | null>(null)
+  const [messageTags, setMessageTags] = useState<Tag[]>(activeMessage?.tags ?? [])
+
+  useEffect(() => {
+    setMessageTags(activeMessage?.tags ?? [])
+  }, [activeMessage?.id])
 
   async function handleCreate() {
     if (!name.trim()) return
@@ -124,6 +133,17 @@ export function MessageEditor() {
               }}
             />
           </div>
+          <TagInput
+            selectedTags={messageTags}
+            onAdd={async (tag) => {
+              await assignTagsToMessage(activeMessage.id, [tag.id])
+              setMessageTags((prev) => [...prev, tag])
+            }}
+            onRemove={async (tagId) => {
+              await removeTagFromMessage(activeMessage.id, tagId)
+              setMessageTags((prev) => prev.filter((t) => t.id !== tagId))
+            }}
+          />
           <button className="text-xs px-1.5 py-1 text-gray-500 hover:bg-gray-100 rounded" onClick={handleExport} title="Export spec">
             Export
           </button>

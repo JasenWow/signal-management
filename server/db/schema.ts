@@ -68,4 +68,29 @@ CREATE INDEX IF NOT EXISTS idx_signals_start_bit ON signals(message_id, start_bi
 CREATE INDEX IF NOT EXISTS idx_versions_message ON versions(message_id);
 CREATE INDEX IF NOT EXISTS idx_versions_created ON versions(created_at);
 CREATE INDEX IF NOT EXISTS idx_vte_table ON value_table_entries(value_table_id);
+
+CREATE TABLE IF NOT EXISTS tags (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL UNIQUE,
+  color       TEXT NOT NULL DEFAULT '#6B7280',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS signal_tags (
+  signal_id   TEXT NOT NULL REFERENCES signals(id) ON DELETE CASCADE,
+  tag_id      TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (signal_id, tag_id)
+);
+
+CREATE TABLE IF NOT EXISTS message_tags (
+  message_id  TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  tag_id      TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (message_id, tag_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_signal_tags_signal ON signal_tags(signal_id);
+CREATE INDEX IF NOT EXISTS idx_signal_tags_tag ON signal_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_message_tags_message ON message_tags(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_tags_tag ON message_tags(tag_id);
 `

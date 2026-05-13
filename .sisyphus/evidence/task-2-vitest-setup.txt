@@ -1,0 +1,21 @@
+=== Vitest Setup Verification ===
+Date: Wed May 13 22:22:42 CST 2026
+
+Files created:
+tests/:
+total 8
+drwxr-xr-x@  3 jansenwood  staff   96 May 13 22:21 .
+drwxr-xr-x  20 jansenwood  staff  640 May 13 22:21 ..
+-rw-r--r--@  1 jansenwood  staff  129 May 13 22:21 example.test.ts
+
+Test output:
+
+
+ RUN  v4.1.6 /Volumes/data/documents/codes/signal-management
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  22:22:42
+   Duration  68ms (transform 8ms, setup 0ms, import 12ms, tests 1ms, environment 0ms)
+

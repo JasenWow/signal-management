@@ -11,7 +11,7 @@ function mapSignal(r: DbRow) {
     startBit: r.start_bit, bitLength: r.bit_length, byteOrder: r.byte_order,
     factor: r.factor, offset: r.offset, unit: r.unit,
     minimum: r.minimum, maximum: r.maximum, valueTableId: r.value_table_id,
-    color: r.color, sortOrder: r.sort_order,
+    dataType: r.data_type, color: r.color, sortOrder: r.sort_order,
     createdAt: r.created_at, updatedAt: r.updated_at,
   }
 }
@@ -31,13 +31,13 @@ export default function signalRoutes(db: Database.Database) {
 
     db.prepare(
       `INSERT INTO signals (id, message_id, name, description, start_bit, bit_length, byte_order,
-         factor, offset, unit, minimum, maximum, value_table_id, color, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         factor, offset, unit, minimum, maximum, value_table_id, data_type, color, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id, messageId, body.name, body.description ?? '', body.startBit, body.bitLength,
       body.byteOrder ?? 'big', body.factor ?? 1.0, body.offset ?? 0.0, body.unit ?? '',
       body.minimum ?? null, body.maximum ?? null, body.valueTableId ?? null,
-      body.color ?? '#10B981', (maxOrder?.m ?? -1) + 1, now, now
+      body.dataType ?? null, body.color ?? '#10B981', (maxOrder?.m ?? -1) + 1, now, now
     )
 
     const row = db.prepare('SELECT * FROM signals WHERE id = ?').get(id) as DbRow
@@ -59,7 +59,7 @@ export default function signalRoutes(db: Database.Database) {
          byte_order = COALESCE(?, byte_order), factor = COALESCE(?, factor),
          offset = COALESCE(?, offset), unit = COALESCE(?, unit),
          minimum = ?, maximum = ?,
-         value_table_id = ?, color = COALESCE(?, color),
+         value_table_id = ?, data_type = ?, color = COALESCE(?, color),
          updated_at = ?
        WHERE id = ?`
     ).run(
@@ -70,6 +70,7 @@ export default function signalRoutes(db: Database.Database) {
       body.minimum !== undefined ? body.minimum : existing.minimum,
       body.maximum !== undefined ? body.maximum : existing.maximum,
       body.valueTableId !== undefined ? body.valueTableId : existing.value_table_id,
+      body.dataType !== undefined ? body.dataType : existing.data_type,
       body.color ?? null, now, id
     )
 

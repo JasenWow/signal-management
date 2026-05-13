@@ -2,35 +2,62 @@ import { Hono } from 'hono'
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'crypto'
 import * as jsondiffpatch from 'jsondiffpatch'
-import type { VersionSnapshot } from '../../shared/types.js'
+import type { VersionSnapshot, Message, Signal, Tag, ValueTable, ValueTableEntry } from '../../shared/types.js'
 
 interface DbRow { [key: string]: unknown }
 
-function mapMessage(r: DbRow) {
+function mapMessage(r: DbRow): Message {
   return {
-    id: r.id, name: r.name, description: r.description,
-    frameSize: r.frame_size, byteOrder: r.byte_order,
-    createdAt: r.created_at, updatedAt: r.updated_at,
+    id: r.id as string, name: r.name as string, description: r.description as string,
+    frameSize: r.frame_size as number, byteOrder: r.byte_order as Message['byteOrder'],
+    createdAt: r.created_at as string, updatedAt: r.updated_at as string,
   }
 }
 
-function mapSignal(r: DbRow) {
+function mapSignal(r: DbRow): Signal {
   return {
-    id: r.id, messageId: r.message_id, name: r.name, description: r.description,
-    startBit: r.start_bit, bitLength: r.bit_length, byteOrder: r.byte_order,
-    factor: r.factor, offset: r.offset, unit: r.unit,
-    minimum: r.minimum, maximum: r.maximum, valueTableId: r.value_table_id,
-    color: r.color, sortOrder: r.sort_order,
-    createdAt: r.created_at, updatedAt: r.updated_at,
+    id: r.id as string, messageId: r.message_id as string, name: r.name as string, description: r.description as string,
+    startBit: r.start_bit as number, bitLength: r.bit_length as number, byteOrder: r.byte_order as Signal['byteOrder'],
+    factor: r.factor as number, offset: r.offset as number, unit: r.unit as string,
+    minimum: r.minimum as number | null, maximum: r.maximum as number | null, valueTableId: r.value_table_id as string | null,
+    dataType: r.data_type as Signal['dataType'], color: r.color as string, sortOrder: r.sort_order as number,
+    createdAt: r.created_at as string, updatedAt: r.updated_at as string,
   }
 }
 
-function mapEntry(r: DbRow) {
+function mapEntry(r: DbRow): ValueTableEntry {
   return {
-    id: r.id, valueTableId: r.value_table_id,
-    rawValue: r.raw_value, displayValue: r.display_value,
-    description: r.description, sortOrder: r.sort_order,
+    id: r.id as string, valueTableId: r.value_table_id as string,
+    rawValue: r.raw_value as number, displayValue: r.display_value as string,
+    description: r.description as string, sortOrder: r.sort_order as number,
   }
+}
+
+function mapValueTable(vt: DbRow, entries: ValueTableEntry[]): ValueTable {
+  return {
+    id: vt.id as string, name: vt.name as string, description: vt.description as string,
+    entries, createdAt: vt.created_at as string, updatedAt: vt.updated_at as string,
+  }
+}
+
+function mapTag(r: DbRow): Tag {
+  return { id: r.id as string, name: r.name as string, color: r.color as string, createdAt: r.created_at as string, updatedAt: r.updated_at as string }
+}
+
+function getMessageTags(db: Database.Database, messageId: string) {
+  return (db.prepare(
+    `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
+     FROM tags t JOIN message_tags mt ON t.id = mt.tag_id
+     WHERE mt.message_id = ?`
+  ).all(messageId) as DbRow[]).map(mapTag)
+}
+
+function getSignalTags(db: Database.Database, signalId: string) {
+  return (db.prepare(
+    `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
+     FROM tags t JOIN signal_tags st ON t.id = st.tag_id
+     WHERE st.signal_id = ?`
+  ).all(signalId) as DbRow[]).map(mapTag)
 }
 
 export default function versionRoutes(db: Database.Database) {
@@ -45,13 +72,13 @@ export default function versionRoutes(db: Database.Database) {
     const valueTables = valueTableIds.map((vtId) => {
       const vt = db.prepare('SELECT * FROM value_tables WHERE id = ?').get(vtId) as DbRow
       const entries = (db.prepare('SELECT * FROM value_table_entries WHERE value_table_id = ? ORDER BY sort_order, raw_value').all(vtId) as DbRow[]).map(mapEntry)
-      return { ...mapMessage(vt).id === undefined ? {} : {
-        id: vt.id, name: vt.name, description: vt.description,
-        entries, createdAt: vt.created_at, updatedAt: vt.updated_at,
-      } }
-    }).filter(Boolean)
+      return mapValueTable(vt, entries)
+    })
 
-    return { message: mapMessage(msgRow), signals, valueTables }
+    const messageTags = getMessageTags(db, messageId)
+    const signalTags = signals.map((s) => ({ signalId: s.id, tags: getSignalTags(db, s.id) }))
+
+    return { message: mapMessage(msgRow), signals, valueTables, messageTags, signalTags }
   }
 
   app.post('/', async (c) => {
@@ -139,12 +166,32 @@ export default function versionRoutes(db: Database.Database) {
     db.prepare('DELETE FROM signals WHERE message_id = ?').run(messageId)
     const insSignal = db.prepare(
       `INSERT INTO signals (id, message_id, name, description, start_bit, bit_length, byte_order,
-         factor, offset, unit, minimum, maximum, value_table_id, color, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         factor, offset, unit, minimum, maximum, value_table_id, data_type, color, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     for (const s of snapshot.signals) {
       insSignal.run(s.id, s.messageId, s.name, s.description, s.startBit, s.bitLength, s.byteOrder,
-        s.factor, s.offset, s.unit, s.minimum, s.maximum, s.valueTableId, s.color, s.sortOrder, s.createdAt, now)
+        s.factor, s.offset, s.unit, s.minimum, s.maximum, s.valueTableId, s.dataType ?? null, s.color, s.sortOrder, s.createdAt, now)
+    }
+
+    // Restore signal tags
+    db.prepare('DELETE FROM signal_tags WHERE signal_id IN (SELECT id FROM signals WHERE message_id = ?)').run(messageId)
+    const insSignalTag = db.prepare('INSERT OR IGNORE INTO tags (id, name, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+    const insSignalTagLink = db.prepare('INSERT INTO signal_tags (signal_id, tag_id) VALUES (?, ?)')
+    for (const st of snapshot.signalTags) {
+      for (const tag of st.tags) {
+        insSignalTag.run(tag.id, tag.name, tag.color, tag.createdAt, tag.updatedAt)
+        insSignalTagLink.run(st.signalId, tag.id)
+      }
+    }
+
+    // Restore message tags
+    db.prepare('DELETE FROM message_tags WHERE message_id = ?').run(messageId)
+    const insMessageTag = db.prepare('INSERT OR IGNORE INTO tags (id, name, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+    const insMessageTagLink = db.prepare('INSERT INTO message_tags (message_id, tag_id) VALUES (?, ?)')
+    for (const tag of snapshot.messageTags) {
+      insMessageTag.run(tag.id, tag.name, tag.color, tag.createdAt, tag.updatedAt)
+      insMessageTagLink.run(messageId, tag.id)
     }
 
     const newId = randomUUID()

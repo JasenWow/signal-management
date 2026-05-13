@@ -10,9 +10,10 @@ function bitPosLabel(absBit: number, numbering: BitNumbering): string {
 
 interface SignalListProps {
   onEdit: () => void
+  filterTagIds?: string[]
 }
 
-export function SignalList({ onEdit }: SignalListProps) {
+export function SignalList({ onEdit, filterTagIds = [] }: SignalListProps) {
   const { activeMessageId, activeSignals, selectedSignalId, setSelectedSignal, deleteSignal, bitNumbering } = useMessageStore()
 
   if (!activeMessageId) {
@@ -27,9 +28,20 @@ export function SignalList({ onEdit }: SignalListProps) {
     )
   }
 
+  const filteredSignals = filterTagIds.length > 0
+    ? activeSignals.filter((signal) => {
+        const signalTagIds = (signal.tags ?? []).map((t) => t.id)
+        return filterTagIds.some((id) => signalTagIds.includes(id))
+      })
+    : activeSignals
+
+  if (filteredSignals.length === 0 && activeSignals.length > 0) {
+    return <div className="p-3 text-sm text-gray-400 text-center">No signals match selected tags.</div>
+  }
+
   return (
     <div>
-      {activeSignals.map((signal) => (
+      {filteredSignals.map((signal) => (
         <div
           key={signal.id}
           className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer text-sm border-b border-gray-50 group ${
@@ -45,6 +57,23 @@ export function SignalList({ onEdit }: SignalListProps) {
               {signal.unit ? ` · ${signal.unit}` : ''}
             </div>
           </div>
+          {(signal.tags ?? []).length > 0 && (
+            <div className="flex items-center gap-0.5 shrink-0">
+              {(signal.tags ?? []).slice(0, 3).map((tag) => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center gap-0.5 px-1 py-px rounded text-[10px] leading-tight"
+                  style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
+                  {tag.name}
+                </span>
+              ))}
+              {(signal.tags ?? []).length > 3 && (
+                <span className="text-[10px] text-gray-400">+{(signal.tags ?? []).length - 3}</span>
+              )}
+            </div>
+          )}
           <button
             className="text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
             title="Edit"

@@ -1,5 +1,5 @@
 export type ByteOrder = 'big' | 'little'
-export type SignalDataType = 'unsigned' | 'signed' | 'float' | 'boolean'
+export type SignalDataType = 'uint8' | 'int8' | 'uint16' | 'int16' | 'uint32' | 'int32' | 'uint64' | 'int64' | 'float32' | 'float64' | 'boolean'
 export type BitNumbering = 'msb0' | 'lsb0'
 
 export interface Message {
@@ -8,6 +8,7 @@ export interface Message {
   description: string
   frameSize: number
   byteOrder: ByteOrder
+  tags?: Tag[]
   createdAt: string
   updatedAt: string
 }
@@ -26,7 +27,9 @@ export interface Signal {
   minimum: number | null
   maximum: number | null
   valueTableId: string | null
+  dataType: SignalDataType | null
   color: string
+  tags?: Tag[]
   sortOrder: number
   createdAt: string
   updatedAt: string
@@ -64,6 +67,8 @@ export interface VersionSnapshot {
   message: Message
   signals: Signal[]
   valueTables: ValueTable[]
+  messageTags: Tag[]
+  signalTags: { signalId: string; tags: Tag[] }[]
 }
 
 export interface VersionSummary {
@@ -100,6 +105,7 @@ export interface CreateSignalInput {
   minimum?: number | null
   maximum?: number | null
   valueTableId?: string | null
+  dataType?: SignalDataType
   color?: string
 }
 
@@ -115,6 +121,7 @@ export interface UpdateSignalInput {
   minimum?: number | null
   maximum?: number | null
   valueTableId?: string | null
+  dataType?: SignalDataType
   color?: string
 }
 
@@ -126,4 +133,22 @@ export interface OverlapCheckResult {
 export interface BitRegion {
   startBit: number
   bitLength: number
+}
+
+export interface Tag {
+  id: string
+  name: string
+  color: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateTagInput {
+  name: string
+  color?: string
+}
+
+export interface UpdateTagInput {
+  name?: string
+  color?: string
 }

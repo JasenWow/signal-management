@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMessageStore } from '../../stores/messageStore'
-import { DEFAULT_SIGNAL_COLORS } from '@shared/constants'
-import type { ByteOrder } from '@shared/types'
+import { useTagStore } from '../../stores/tagStore'
+import { DEFAULT_SIGNAL_COLORS, DATA_TYPE_BIT_LENGTH_MAP } from '@shared/constants'
+import type { ByteOrder, SignalDataType, Tag } from '@shared/types'
+import { TagInput } from '../TagInput/TagInput'
 
 interface SignalFormProps {
   mode: 'create' | 'edit'
@@ -34,6 +36,14 @@ export function SignalForm({ mode, onClose }: SignalFormProps) {
   const [positionMode, setPositionMode] = useState<'absolute' | 'byteBit'>('absolute')
   const [error, setError] = useState('')
 
+  const [dataType, setDataType] = useState<SignalDataType | null>(editingSignal?.dataType ?? null)
+  const [signalTags, setSignalTags] = useState<Tag[]>([])
+
+  const { loadTags } = useTagStore()
+  const { assignTagsToSignal } = useTagStore()
+
+  useEffect(() => { loadTags() }, [loadTags])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -46,11 +56,20 @@ export function SignalForm({ mode, onClose }: SignalFormProps) {
       if (editingSignal) {
         await updateSignal(editingSignal.id, {
           name: name.trim(), startBit, bitLength, byteOrder, factor, offset, unit, color,
+          dataType: dataType ?? undefined,
         })
+        if (signalTags.length > 0) {
+          await assignTagsToSignal(editingSignal.id, signalTags.map((t) => t.id))
+        }
       } else {
         await createSignal({
           name: name.trim(), startBit, bitLength, byteOrder, factor, offset, unit, color,
+          dataType: dataType ?? undefined,
         })
+        const createdSignalId = activeSignals[activeSignals.length - 1]?.id
+        if (signalTags.length > 0 && createdSignalId) {
+          await assignTagsToSignal(createdSignalId, signalTags.map((t) => t.id))
+        }
       }
       onClose()
     } catch (err) {
@@ -162,6 +181,43 @@ export function SignalForm({ mode, onClose }: SignalFormProps) {
 
         <div className="grid grid-cols-3 gap-3">
           <div>
+            <label className="block text-xs font-medium text-gray-500 mb-0.5">Data Type</label>
+            <select
+              className="w-full border rounded px-2.5 py-1.5 text-sm"
+              value={dataType ?? ''}
+              onChange={(e) => {
+                const val = e.target.value as SignalDataType | ''
+                const newType = val === '' ? null : val
+                setDataType(newType)
+                if (newType && newType in DATA_TYPE_BIT_LENGTH_MAP) {
+                  setBitLength(DATA_TYPE_BIT_LENGTH_MAP[newType])
+                }
+              }}
+            >
+              <option value="">未设置</option>
+              <optgroup label="整数类型">
+                <option value="uint8">uint8</option>
+                <option value="int8">int8</option>
+                <option value="uint16">uint16</option>
+                <option value="int16">int16</option>
+                <option value="uint32">uint32</option>
+                <option value="int32">int32</option>
+                <option value="uint64">uint64</option>
+                <option value="int64">int64</option>
+              </optgroup>
+              <optgroup label="浮点类型">
+                <option value="float32">float32</option>
+                <option value="float64">float64</option>
+              </optgroup>
+              <optgroup label="其他">
+                <option value="boolean">boolean</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div>
             <label className="block text-xs font-medium text-gray-500 mb-0.5">Byte Order</label>
             <select
               className="w-full border rounded px-2.5 py-1.5 text-sm"
@@ -199,6 +255,15 @@ export function SignalForm({ mode, onClose }: SignalFormProps) {
             placeholder="e.g. rpm, km/h, %"
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-0.5">Tags</label>
+          <TagInput
+            selectedTags={signalTags}
+            onAdd={(tag) => setSignalTags((prev) => [...prev, tag])}
+            onRemove={(tagId) => setSignalTags((prev) => prev.filter((t) => t.id !== tagId))}
           />
         </div>
 

@@ -10,6 +10,7 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />} />
+        <Route path="/tags" element={<App />} />
         <Route path="/:messageId" element={<App />} />
       </Routes>
     </BrowserRouter>

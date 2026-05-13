@@ -9,6 +9,7 @@ import messageRoutes from './routes/messages.js'
 import signalRoutes from './routes/signals.js'
 import valueTableRoutes from './routes/valueTables.js'
 import versionRoutes from './routes/versions.js'
+import tagRoutes from './routes/tags.js'
 
 const app = new Hono()
 
@@ -22,6 +23,7 @@ app.route('/api/messages', messageRoutes(db))
 app.route('/api', signalRoutes(db))
 app.route('/api/value-tables', valueTableRoutes(db))
 app.route('/api/versions', versionRoutes(db))
+app.route('/api/tags', tagRoutes(db))
 
 // Serve static assets from dist/
 app.get('/assets/*', serveStatic({ root: './dist/' }))

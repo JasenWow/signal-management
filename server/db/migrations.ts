@@ -11,6 +11,10 @@ const migrations: Migration[] = [
     name: '001_initial_schema',
     up: SCHEMA_DDL,
   },
+  {
+    name: '002_tags_and_data_type',
+    up: `ALTER TABLE signals ADD COLUMN data_type TEXT DEFAULT NULL;`,
+  },
 ]
 
 export function runMigrations(db: Database.Database): void {
