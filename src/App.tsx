@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useParams, useNavigate } from 'react-router'
 import { useMessageStore } from './stores/messageStore'
 import { useVersionStore } from './stores/versionStore'
 import { MessageEditor } from './components/MessageEditor/MessageEditor'
@@ -8,6 +9,8 @@ import { BitCanvas } from './components/BitCanvas/BitCanvas'
 import { VersionPanel } from './components/VersionPanel/VersionPanel'
 
 export default function App() {
+  const { messageId } = useParams<{ messageId: string }>()
+  const navigate = useNavigate()
   const { messages, activeMessageId, activeMessage, loadMessages, selectMessage, addSignal } = useMessageStore()
   const { loadVersions } = useVersionStore()
   const [signalFormMode, setSignalFormMode] = useState<'closed' | 'create' | 'edit'>('closed')
@@ -21,6 +24,14 @@ export default function App() {
       loadVersions(activeMessageId)
     }
   }, [activeMessageId, loadVersions])
+
+  useEffect(() => {
+    if (messageId) {
+      selectMessage(messageId).catch(() => {
+        navigate('/', { replace: true })
+      })
+    }
+  }, [messageId])
 
   function handleBitSelection(startBit: number, bitLength: number) {
     addSignal({ startBit, bitLength })
@@ -45,7 +56,14 @@ export default function App() {
         <select
           className="border rounded px-2 py-1 text-sm bg-white"
           value={activeMessageId ?? ''}
-          onChange={(e) => selectMessage(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value
+            if (value) {
+              navigate(`/${value}`)
+            } else {
+              navigate('/')
+            }
+          }}
         >
           <option value="">-- Select Message --</option>
           {messages.map((m) => (
