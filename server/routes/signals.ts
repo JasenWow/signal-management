@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type Database from 'better-sqlite3'
-import { randomUUID } from 'crypto'
+import { generateSignalId } from '../../shared/signal-id.js'
 import type { CreateSignalInput, UpdateSignalInput } from '../../shared/types.js'
 
 interface DbRow { [key: string]: unknown }
@@ -22,23 +22,35 @@ export default function signalRoutes(db: Database.Database) {
   app.post('/messages/:messageId/signals', async (c) => {
     const { messageId } = c.req.param()
     const body = await c.req.json<CreateSignalInput>()
-    const id = randomUUID()
+    let id: string
+    try {
+      id = generateSignalId(messageId, body.name, body.startBit, body.bitLength)
+    } catch (err: any) {
+      return c.json({ error: err.message }, 400)
+    }
     const now = new Date().toISOString()
 
     const maxOrder = db
       .prepare('SELECT MAX(sort_order) as m FROM signals WHERE message_id = ?')
       .get(messageId) as { m: number | null }
 
-    db.prepare(
-      `INSERT INTO signals (id, message_id, name, description, start_bit, bit_length, byte_order,
-         factor, offset, unit, minimum, maximum, value_table_id, data_type, color, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      id, messageId, body.name, body.description ?? '', body.startBit, body.bitLength,
-      body.byteOrder ?? 'big', body.factor ?? 1.0, body.offset ?? 0.0, body.unit ?? '',
-      body.minimum ?? null, body.maximum ?? null, body.valueTableId ?? null,
-      body.dataType ?? null, body.color ?? '#10B981', (maxOrder?.m ?? -1) + 1, now, now
-    )
+    try {
+      db.prepare(
+        `INSERT INTO signals (id, message_id, name, description, start_bit, bit_length, byte_order,
+           factor, offset, unit, minimum, maximum, value_table_id, data_type, color, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        id, messageId, body.name, body.description ?? '', body.startBit, body.bitLength,
+        body.byteOrder ?? 'big', body.factor ?? 1.0, body.offset ?? 0.0, body.unit ?? '',
+        body.minimum ?? null, body.maximum ?? null, body.valueTableId ?? null,
+        body.dataType ?? null, body.color ?? '#10B981', (maxOrder?.m ?? -1) + 1, now, now
+      )
+    } catch (err: any) {
+      if (err.message.includes('UNIQUE') || err.message.includes('SQLITE_CONSTRAINT')) {
+        return c.json({ error: 'Signal already exists with the same name, startBit and bitLength in this message' }, 409)
+      }
+      throw err
+    }
 
     const row = db.prepare('SELECT * FROM signals WHERE id = ?').get(id) as DbRow
     return c.json(mapSignal(row), 201)

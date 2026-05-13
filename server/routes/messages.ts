@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'crypto'
+import { generateSignalId } from '../../shared/signal-id.js'
 import type { CreateMessageInput, UpdateMessageInput, Message, Signal, Tag } from '../../shared/types.js'
 
 interface DbRow { [key: string]: unknown }
@@ -134,14 +135,48 @@ export default function messageRoutes(db: Database.Database) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
 
-    for (let i = 0; i < body.signals.length; i++) {
-      const s = body.signals[i]
-      signalInsert.run(
-        randomUUID(), messageId, s.name, s.description ?? '', s.startBit, s.bitLength,
-        s.byteOrder ?? 'big', s.factor ?? 1.0, s.offset ?? 0.0, s.unit ?? '',
-        s.minimum ?? null, s.maximum ?? null, null,
-        s.color ?? '#10B981', s.sortOrder ?? i, now, now
-      )
+    const insertSignals = db.transaction((signals: typeof body.signals) => {
+      const conflictingSignals: string[] = []
+      for (let i = 0; i < signals.length; i++) {
+        const s = signals[i]
+        let signalId: string
+        try {
+          signalId = generateSignalId(messageId, s.name, s.startBit, s.bitLength)
+        } catch (err: any) {
+          throw Object.assign(new Error(`Invalid signal "${s.name}": ${err.message}`), { status: 400 })
+        }
+        try {
+          signalInsert.run(
+            signalId, messageId, s.name, s.description ?? '', s.startBit, s.bitLength,
+            s.byteOrder ?? 'big', s.factor ?? 1.0, s.offset ?? 0.0, s.unit ?? '',
+            s.minimum ?? null, s.maximum ?? null, null,
+            s.color ?? '#10B981', s.sortOrder ?? i, now, now
+          )
+        } catch (err: any) {
+          if (err.message.includes('UNIQUE') || err.message.includes('SQLITE_CONSTRAINT')) {
+            conflictingSignals.push(s.name)
+          }
+          throw err
+        }
+      }
+      if (conflictingSignals.length > 0) {
+        throw Object.assign(
+          new Error(`Signal(s) ${conflictingSignals.map(n => `"${n}"`).join(', ')} already exist in this message`),
+          { conflictingSignals, status: 409 }
+        )
+      }
+    })
+
+    try {
+      insertSignals(body.signals)
+    } catch (err: any) {
+      if (err.status === 409) {
+        return c.json({ error: err.message, conflictingSignals: err.conflictingSignals }, 409)
+      }
+      if (err.status === 400) {
+        return c.json({ error: err.message }, 400)
+      }
+      return c.json({ error: err.message }, 500)
     }
 
     const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) as DbRow
