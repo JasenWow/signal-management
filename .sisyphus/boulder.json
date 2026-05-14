@@ -1,75 +1,49 @@
 {
-  "active_plan": "/Volumes/data/documents/codes/signal-management/.sisyphus/plans/tag-and-datatype.md",
-  "started_at": "2026-05-13T14:18:46.683Z",
+  "active_plan": "/Volumes/data/documents/codes/signal-management/.sisyphus/plans/signal-id-generation.md",
+  "started_at": "2026-05-13T16:11:40.106Z",
   "session_ids": [
-    "ses_1de5f4810ffe9dJrAxI76SFF16",
-    "ses_1ddf59a49ffe4FHUKK44m6ev3W",
-    "ses_1ddf56ed3ffd553MJuOBgCYY5r",
-    "ses_1ddf5332dffegQzO2mI6aMWcmH",
-    "ses_1ddf4f3f7ffeUaLD9ArjjnqBfJ"
+    "ses_1ddea06bdffesFvxJaWqLD6xIY"
   ],
   "session_origins": {
-    "ses_1de5f4810ffe9dJrAxI76SFF16": "direct",
-    "ses_1ddf59a49ffe4FHUKK44m6ev3W": "appended",
-    "ses_1ddf56ed3ffd553MJuOBgCYY5r": "appended",
-    "ses_1ddf5332dffegQzO2mI6aMWcmH": "appended",
-    "ses_1ddf4f3f7ffeUaLD9ArjjnqBfJ": "appended"
+    "ses_1ddea06bdffesFvxJaWqLD6xIY": "direct"
   },
-  "plan_name": "tag-and-datatype",
+  "plan_name": "signal-id-generation",
   "agent": "atlas",
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "Shared Types + Constants Update",
-      "session_id": "ses_1de4a864affds33yF4iVLpfwXO",
+      "task_title": "创建 `shared/signal-id.ts` 工具函数 + 单元测试",
+      "session_id": "ses_1dde37e3dffekLMKsMXFWb5fDa",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-05-13T14:24:13.944Z"
+      "updated_at": "2026-05-13T16:15:54.112Z"
     },
-    "todo:3": {
-      "task_key": "todo:3",
-      "task_label": "3",
-      "task_title": "DB Migration for Tags + Data Type",
-      "session_id": "ses_1de4a8833ffeWHEsuV2TC6Qqjr",
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "更新 signal 创建路由 (`server/routes/signals.ts`)",
+      "session_id": "ses_1dddefc31ffeDt00CeWfC2u1va",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-05-13T14:29:56.596Z"
+      "updated_at": "2026-05-13T16:18:27.585Z"
     },
-    "todo:5": {
-      "task_key": "todo:5",
-      "task_label": "5",
-      "task_title": "Update Signals API (data_type + tags)",
-      "session_id": "ses_1de01404bffe04SMdopUy1KOKO",
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "集成测试 + 全量回归验证",
+      "session_id": "ses_1dddb9973ffeRjlprNl3ib49S0",
       "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-05-13T15:41:03.329Z"
-    },
-    "todo:6": {
-      "task_key": "todo:6",
-      "task_label": "6",
-      "task_title": "Update Messages API (tags)",
-      "session_id": "ses_1ddfe9d70ffeu6KU8IuX3GMVNd",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-05-13T15:43:42.998Z"
-    },
-    "todo:7": {
-      "task_key": "todo:7",
-      "task_label": "7",
-      "task_title": "Update Version Snapshots (include tags + data_type)",
-      "session_id": "ses_1ddfbfab0ffej6GZqZLkO3geJe",
-      "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-05-13T15:48:11.051Z"
+      "category": "quick",
+      "updated_at": "2026-05-13T16:26:57.990Z"
     },
     "final-wave:f1": {
       "task_key": "final-wave:f1",
       "task_label": "F1",
       "task_title": "**Plan Compliance Audit** — `oracle`",
-      "session_id": "ses_1ddf4f3f7ffeUaLD9ArjjnqBfJ",
+      "session_id": "ses_1ddd5558cffe6kUfSLSaGqtYxx",
       "agent": "oracle",
-      "updated_at": "2026-05-13T15:56:02.922Z"
+      "updated_at": "2026-05-13T17:01:43.652Z"
     }
   }
 }

@@ -58,10 +58,10 @@
 - `tests/signal-duplicate.test.ts` — 集成测试
 
 ### Definition of Done
-- [ ] `generateSignalId("msg-1", "foo", 0, 8)` 始终返回相同的 16 hex 字符串
-- [ ] 相同参数创建 signal 第二次返回 409 Conflict
-- [ ] 所有现有测试 `vitest run` 通过
-- [ ] 新增测试全部通过
+- [x] `generateSignalId("msg-1", "foo", 0, 8)` 始终返回相同的 16 hex 字符串
+- [x] 相同参数创建 signal 第二次返回 409 Conflict
+- [x] 所有现有测试 `vitest run` 通过
+- [x] 新增测试全部通过
 
 ### Must Have
 - SHA-256 哈希截断 16 hex 字符
@@ -148,7 +148,7 @@ Max Concurrent: 4 (FINAL wave)
 
 ## TODOs
 
-- [ ] 1. 创建 `shared/signal-id.ts` 工具函数 + 单元测试
+- [x] 1. 创建 `shared/signal-id.ts` 工具函数 + 单元测试
 
   **What to do**:
   - 创建 `shared/signal-id.ts`，导出 `generateSignalId(messageId: string, name: string, startBit: number, bitLength: number): string`
@@ -248,7 +248,7 @@ Max Concurrent: 4 (FINAL wave)
   - Files: `shared/signal-id.ts`, `tests/signal-id.test.ts`
   - Pre-commit: `npx vitest run tests/signal-id.test.ts`
 
-- [ ] 2. 更新 signal 创建路由 (`server/routes/signals.ts`)
+- [x] 2. 更新 signal 创建路由 (`server/routes/signals.ts`)
 
   **What to do**:
   - 将 `import { randomUUID } from 'crypto'` 替换为 `import { generateSignalId } from '../../shared/signal-id.js'`
@@ -341,7 +341,7 @@ Max Concurrent: 4 (FINAL wave)
   - Files: `server/routes/signals.ts`
   - Pre-commit: `npx tsc --noEmit`
 
-- [ ] 3. 更新 import 路由 (`server/routes/messages.ts`)
+- [x] 3. 更新 import 路由 (`server/routes/messages.ts`)
 
   **What to do**:
   - 在 `server/routes/messages.ts` 中导入 `generateSignalId`
@@ -433,7 +433,7 @@ Max Concurrent: 4 (FINAL wave)
   - Files: `server/routes/messages.ts`
   - Pre-commit: `npx tsc --noEmit`
 
-- [ ] 4. 集成测试 + 全量回归验证
+- [x] 4. 集成测试 + 全量回归验证
 
   **What to do**:
   - 创建 `tests/signal-duplicate.test.ts`，包含端到端 API 集成测试：
@@ -520,19 +520,19 @@ Max Concurrent: 4 (FINAL wave)
 
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, run command). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   Run `tsc --noEmit` + `vitest run`. Review all changed files for: `as any`/`@ts-ignore`, empty catches, console.log in prod, commented-out code, unused imports. Check AI slop: excessive comments, over-abstraction, generic names.
   Output: `Build [PASS/FAIL] | Lint [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
-- [ ] F3. **Real Manual QA** — `unspecified-high`
+- [x] F3. **Real Manual QA** — `unspecified-high`
   Start from clean state. Execute EVERY QA scenario from EVERY task — follow exact steps, capture evidence. Test cross-task integration. Save to `.sisyphus/evidence/final-qa/`.
   Output: `Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   For each task: read "What to do", read actual diff (git diff). Verify 1:1 — everything in spec was built, nothing beyond spec. Check "Must NOT do" compliance. Flag unaccounted changes.
   Output: `Tasks [N/N compliant] | Contamination [CLEAN/N issues] | Unaccounted [CLEAN/N files] | VERDICT`
 
@@ -568,9 +568,9 @@ node -e "const { generateSignalId } = require('./shared/signal-id.ts'); console.
 ```
 
 ### Final Checklist
-- [ ] All "Must Have" present
-- [ ] All "Must NOT Have" absent
-- [ ] All tests pass
-- [ ] `generateSignalId` 对相同输入始终返回相同结果
-- [ ] 重复创建返回 409 Conflict
-- [ ] 导入路由也使用确定性 ID
+- [x] All "Must Have" present
+- [x] All "Must NOT Have" absent
+- [x] All tests pass
+- [x] `generateSignalId` 对相同输入始终返回相同结果
+- [x] 重复创建返回 409 Conflict
+- [x] 导入路由也使用确定性 ID
