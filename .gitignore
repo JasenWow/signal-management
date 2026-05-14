@@ -3,3 +3,5 @@ dist
 data/*.db
 *.db-journal
 .vite
+data/*.db-shm
+data/*.db-wal
