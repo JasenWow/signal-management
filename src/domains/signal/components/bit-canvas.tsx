@@ -14,6 +14,7 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
   const message = activeMessage
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoveredBit, setHoveredBit] = useState<number | null>(null)
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null)
   const [dragPreview, setDragPreview] = useState<{ startBit: number; bitLength: number } | null>(null)
 
   const cellSize = DEFAULT_CELL_SIZE
@@ -119,6 +120,10 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
           onMouseMove={(e) => {
             const bit = getBitIndex(e.clientX, e.clientY)
             setHoveredBit(bit)
+            const rect = svgRef.current?.getBoundingClientRect()
+            if (rect) {
+              setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+            }
             if (bit !== null) {
               const preview = handleMouseMove(bit)
               setDragPreview(preview)
@@ -130,6 +135,7 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
           }}
           onMouseLeave={() => {
             setHoveredBit(null)
+            setMousePos(null)
             setDragPreview(null)
             handleMouseUp()
           }}
@@ -183,19 +189,73 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
             ))
           })()}
 
-          {hoveredBit !== null && !dragPreview && (
-            <text
-              x={(hoveredBit % 8) * cellSize + cellSize / 2}
-              y={Math.floor(hoveredBit / 8) * cellSize + cellSize / 2}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={10}
-              fill="#6b7280"
-              style={{ pointerEvents: 'none' }}
-            >
-              B{Math.floor(hoveredBit / 8)}:{getBitLabel(hoveredBit % 8, bitNumbering)}
-            </text>
-          )}
+          {hoveredBit !== null && !dragPreview && (() => {
+            const signal = getSignalAtBit(hoveredBit)
+            if (signal && mousePos) {
+              const tipX = mousePos.x + 12
+              const tipY = mousePos.y - 8
+              const lines = [
+                signal.name,
+                `B${Math.floor(signal.startBit / 8)}:${getBitLabel(signal.startBit % 8, bitNumbering)} — B${Math.floor((signal.startBit + signal.bitLength - 1) / 8)}:${getBitLabel((signal.startBit + signal.bitLength - 1) % 8, bitNumbering)} (${signal.bitLength}b)`,
+                signal.dataType ?? 'raw',
+                signal.unit ? `Unit: ${signal.unit}` : null,
+                signal.factor !== 1 || signal.offset !== 0 ? `Factor: ${signal.factor}, Offset: ${signal.offset}` : null,
+              ].filter(Boolean) as string[]
+
+              const lineH = 16
+              const padX = 10
+              const padY = 6
+              const tipW = Math.max(...lines.map((l) => l.length * 7.2 + padX * 2)) + 4
+              const tipH = lines.length * lineH + padY * 2
+              const clampedX = Math.min(tipX, width - tipW - 4)
+              const clampedY = Math.max(tipY - tipH, 4)
+
+              return (
+                <g style={{ pointerEvents: 'none' }}>
+                  <rect
+                    x={clampedX}
+                    y={clampedY}
+                    width={tipW}
+                    height={tipH}
+                    rx={4}
+                    fill="rgba(15,23,42,0.92)"
+                    stroke={signal.color}
+                    strokeWidth={1}
+                  />
+                  {lines.map((line, i) => (
+                    <text
+                      key={i}
+                      x={clampedX + padX}
+                      y={clampedY + padY + 12 + i * lineH}
+                      fontSize={11}
+                      fontFamily="monospace"
+                      fill={i === 0 ? signal.color : '#e2e8f0'}
+                      fontWeight={i === 0 ? 'bold' : 'normal'}
+                    >
+                      {line}
+                    </text>
+                  ))}
+                </g>
+              )
+            }
+
+            if (!signal) {
+              return (
+                <text
+                  x={(hoveredBit % 8) * cellSize + cellSize / 2}
+                  y={Math.floor(hoveredBit / 8) * cellSize + cellSize / 2}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={11}
+                  fill="#9ca3af"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  B{Math.floor(hoveredBit / 8)}:{getBitLabel(hoveredBit % 8, bitNumbering)}
+                </text>
+              )
+            }
+            return null
+          })()}
         </svg>
       </div>
 
@@ -203,7 +263,13 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
         {dragPreview
           ? `Selected: B${Math.floor(dragPreview.startBit / 8)}:${getBitLabel(dragPreview.startBit % 8, bitNumbering)} — B${Math.floor((dragPreview.startBit + dragPreview.bitLength - 1) / 8)}:${getBitLabel((dragPreview.startBit + dragPreview.bitLength - 1) % 8, bitNumbering)} (${dragPreview.bitLength} bits)`
           : hoveredBit !== null
-            ? `Byte ${Math.floor(hoveredBit / 8)}, Bit ${getBitLabel(hoveredBit % 8, bitNumbering)} (abs: ${hoveredBit})`
+            ? (() => {
+                const signal = getSignalAtBit(hoveredBit)
+                if (signal) {
+                  return `${signal.name} — ${signal.bitLength}b ${signal.dataType ?? 'raw'}${signal.unit ? ` · ${signal.unit}` : ''}`
+                }
+                return `Byte ${Math.floor(hoveredBit / 8)}, Bit ${getBitLabel(hoveredBit % 8, bitNumbering)} (abs: ${hoveredBit})`
+              })()
             : 'Click and drag to select a bit region for a new signal'
         }
       </div>

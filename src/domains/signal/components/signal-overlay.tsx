@@ -82,7 +82,7 @@ export function SignalOverlay({ signals, cellSize, selectedSignalId }: SignalOve
         const row = Math.floor(firstBit / 8)
         const col = firstBit % 8
         const textX = col * cellSize + cellSize / 2
-        const textY = row * cellSize + 8
+        const textY = row * cellSize + 10
 
         if (signal.bitLength < 4) return null
 
@@ -93,10 +93,10 @@ export function SignalOverlay({ signals, cellSize, selectedSignalId }: SignalOve
             y={textY}
             textAnchor="middle"
             dominantBaseline="hanging"
-            className="text-[9px] font-semibold pointer-events-none"
+            className="text-[11px] font-semibold pointer-events-none"
             fill={signal.color}
           >
-            {signal.name.length > 8 ? signal.name.slice(0, 7) + '…' : signal.name}
+            {signal.name.length > 12 ? signal.name.slice(0, 11) + '…' : signal.name}
           </text>
         )
       })}
