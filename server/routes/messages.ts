@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'crypto'
-import { generateSignalId } from '../../shared/signal-id.js'
-import type { CreateMessageInput, UpdateMessageInput, Message, Signal, Tag } from '../../shared/types.js'
+import { generateSignalId } from '../../src/foundation/lib/signal-id.js'
+import type { CreateMessageInput, UpdateMessageInput, Message, Signal, Tag } from '../../src/foundation/types.js'
 
 interface DbRow { [key: string]: unknown }
 

@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'crypto'
 import * as jsondiffpatch from 'jsondiffpatch'
-import type { VersionSnapshot, Message, Signal, Tag, ValueTable, ValueTableEntry } from '../../shared/types.js'
+import type { VersionSnapshot, Message, Signal, Tag, ValueTable, ValueTableEntry } from '../../src/foundation/types.js'
 
 interface DbRow { [key: string]: unknown }
 

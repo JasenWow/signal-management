@@ -16,9 +16,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
-      "@shared/*": ["./shared/*"],
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "shared"]
+  "include": ["src"]
 }

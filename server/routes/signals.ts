@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type Database from 'better-sqlite3'
-import { generateSignalId } from '../../shared/signal-id.js'
-import type { CreateSignalInput, UpdateSignalInput } from '../../shared/types.js'
+import { generateSignalId } from '../../src/foundation/lib/signal-id.js'
+import type { CreateSignalInput, UpdateSignalInput } from '../../src/foundation/types.js'
 
 interface DbRow { [key: string]: unknown }
 

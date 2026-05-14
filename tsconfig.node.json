@@ -12,9 +12,7 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "paths": {
-      "@shared/*": ["./shared/*"]
-    }
+    "paths": {}
   },
-  "include": ["server", "shared"]
+  "include": ["server", "src/foundation"]
 }
