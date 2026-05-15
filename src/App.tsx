@@ -1,4 +1,4 @@
-import { Routes, Route, useParams } from 'react-router'
+import { Switch, Route, useParams } from 'react-router-dom'
 import { Layout } from './pages/layout'
 import { MessageShowPage } from './pages/message/show'
 import { TagsListPage } from './pages/tags/list'
@@ -23,10 +23,10 @@ function LayoutHome() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<LayoutHome />} />
-      <Route path="/tags" element={<Layout><TagsListPage /></Layout>} />
-      <Route path="/:messageId" element={<LayoutWithMessageId />} />
-    </Routes>
+    <Switch>
+      <Route exact path="/" render={() => <LayoutHome />} />
+      <Route path="/tags" render={() => <Layout><TagsListPage /></Layout>} />
+      <Route path="/:messageId" render={() => <LayoutWithMessageId />} />
+    </Switch>
   )
 }

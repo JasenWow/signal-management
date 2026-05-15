@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router'
+import { useParams, useHistory } from 'react-router-dom'
 import { useMessageStore } from '@/domains/message/hooks/use-message-store'
 import { useVersionStore } from '@/domains/version/hooks/use-version-store'
 import { SignalList } from '@/domains/signal/components/signal-list'
@@ -10,7 +10,7 @@ import { TagFilter } from '@/domains/tag/components/tag-filter'
 
 export function MessageShowPage() {
   const { messageId } = useParams<{ messageId: string }>()
-  const navigate = useNavigate()
+  const history = useHistory()
   const { activeMessageId, activeMessage, loadMessages, selectMessage, addSignal } = useMessageStore()
   const { loadVersions } = useVersionStore()
   const [signalFormMode, setSignalFormMode] = useState<'closed' | 'create' | 'edit'>('closed')
@@ -29,7 +29,7 @@ export function MessageShowPage() {
   useEffect(() => {
     if (messageId) {
       selectMessage(messageId).catch(() => {
-        navigate('/', { replace: true })
+        history.replace('/')
       })
     }
   }, [messageId])

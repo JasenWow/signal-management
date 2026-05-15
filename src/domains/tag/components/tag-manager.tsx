@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router'
+import { useHistory } from 'react-router-dom'
 import { useTagStore } from '../hooks/use-tag-store'
 import { useMessageStore } from '@/domains/message/hooks/use-message-store'
 import { DEFAULT_TAG_COLORS } from '@/foundation/lib/constants'
@@ -15,7 +15,7 @@ interface MessageWithSignals extends Message {
 }
 
 export function TagManager() {
-  const navigate = useNavigate()
+  const history = useHistory()
   const { tags, loadTags, createTag, updateTag, deleteTag } = useTagStore()
   const { messages, loadMessages } = useMessageStore()
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null)
@@ -159,7 +159,7 @@ export function TagManager() {
                       <div
                         key={m.id}
                         className="text-sm bg-white rounded px-3 py-1.5 border cursor-pointer hover:bg-gray-50"
-                        onClick={() => navigate(`/${m.id}`)}
+                        onClick={() => history.push(`/${m.id}`)}
                       >
                         {m.name} ({m.frameSize}B)
                       </div>
@@ -178,7 +178,7 @@ export function TagManager() {
                       <div
                         key={s.id}
                         className="text-sm bg-white rounded px-3 py-1.5 border cursor-pointer hover:bg-gray-50"
-                        onClick={() => navigate(`/${s.messageId}`)}
+                        onClick={() => history.push(`/${s.messageId}`)}
                       >
                         {s.name} <span className="text-gray-400">in {s.messageName}</span>
                       </div>

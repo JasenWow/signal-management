@@ -1,9 +1,9 @@
-import { useNavigate } from 'react-router'
+import { useHistory } from 'react-router-dom'
 import { useMessageStore } from '@/domains/message/hooks/use-message-store'
 import { MessageEditor } from '@/domains/message/components/message-editor'
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate()
+  const history = useHistory()
   const { messages, activeMessageId } = useMessageStore()
 
   return (
@@ -17,9 +17,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           onChange={(e) => {
             const value = e.target.value
             if (value) {
-              navigate(`/${value}`)
+              history.push(`/${value}`)
             } else {
-              navigate('/')
+              history.push('/')
             }
           }}
         >
@@ -31,7 +31,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <MessageEditor />
         <button
           className="px-2.5 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 shrink-0"
-          onClick={() => navigate('/tags')}
+          onClick={() => history.push('/tags')}
         >
           Tags
         </button>
