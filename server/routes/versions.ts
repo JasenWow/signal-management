@@ -1,96 +1,58 @@
 import { Hono } from 'hono'
-import type { Database } from 'bun:sqlite'
+import { eq, desc, sql, inArray } from 'drizzle-orm'
+import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { randomUUID } from 'crypto'
 import * as jsondiffpatch from 'jsondiffpatch'
-import type { VersionSnapshot, Message, Signal, Tag, ValueTable, ValueTableEntry } from '../../src/foundation/types.js'
+import type { VersionSnapshot } from '../../src/foundation/types.js'
+import * as schema from '../db/schema.js'
 
-interface DbRow { [key: string]: unknown }
+const { messages, signals, valueTables, valueTableEntries, versions, tags, signalTags, messageTags } = schema
 
-function mapMessage(r: DbRow): Message {
-  return {
-    id: r.id as string, name: r.name as string, description: r.description as string,
-    frameSize: r.frame_size as number, byteOrder: r.byte_order as Message['byteOrder'],
-    createdAt: r.created_at as string, updatedAt: r.updated_at as string,
-  }
+function getSignalTags(db: BunSQLiteDatabase<typeof schema>, signalId: string) {
+  return db.select({ id: tags.id, name: tags.name, color: tags.color, createdAt: tags.createdAt, updatedAt: tags.updatedAt })
+    .from(tags).innerJoin(signalTags, eq(tags.id, signalTags.tagId))
+    .where(eq(signalTags.signalId, signalId)).all()
 }
 
-function mapSignal(r: DbRow): Signal {
-  return {
-    id: r.id as string, messageId: r.message_id as string, name: r.name as string, description: r.description as string,
-    startBit: r.start_bit as number, bitLength: r.bit_length as number, byteOrder: r.byte_order as Signal['byteOrder'],
-    factor: r.factor as number, offset: r.offset as number, unit: r.unit as string,
-    minimum: r.minimum as number | null, maximum: r.maximum as number | null, valueTableId: r.value_table_id as string | null,
-    dataType: r.data_type as Signal['dataType'], color: r.color as string, sortOrder: r.sort_order as number,
-    createdAt: r.created_at as string, updatedAt: r.updated_at as string,
-  }
+function getMessageTags(db: BunSQLiteDatabase<typeof schema>, messageId: string) {
+  return db.select({ id: tags.id, name: tags.name, color: tags.color, createdAt: tags.createdAt, updatedAt: tags.updatedAt })
+    .from(tags).innerJoin(messageTags, eq(tags.id, messageTags.tagId))
+    .where(eq(messageTags.messageId, messageId)).all()
 }
 
-function mapEntry(r: DbRow): ValueTableEntry {
-  return {
-    id: r.id as string, valueTableId: r.value_table_id as string,
-    rawValue: r.raw_value as number, displayValue: r.display_value as string,
-    description: r.description as string, sortOrder: r.sort_order as number,
-  }
+function buildSnapshot(db: BunSQLiteDatabase<typeof schema>, messageId: string): VersionSnapshot {
+  const msgRow = db.select().from(messages).where(eq(messages.id, messageId)).get()!
+  const signalRows = db.select().from(signals).where(eq(signals.messageId, messageId)).orderBy(signals.startBit).all()
+
+  const valueTableIds = [...new Set(signalRows.map(s => s.valueTableId).filter(Boolean))] as string[]
+  const vtList = valueTableIds.map(vtId => {
+    const vt = db.select().from(valueTables).where(eq(valueTables.id, vtId!)).get()!
+    const entries = db.select().from(valueTableEntries)
+      .where(eq(valueTableEntries.valueTableId, vtId!))
+      .orderBy(valueTableEntries.sortOrder, valueTableEntries.rawValue).all()
+    return { ...vt, entries }
+  })
+
+  const mTags = getMessageTags(db, messageId)
+  const sTags = signalRows.map(s => ({ signalId: s.id, tags: getSignalTags(db, s.id) }))
+
+  return { message: msgRow, signals: signalRows, valueTables: vtList, messageTags: mTags, signalTags: sTags }
 }
 
-function mapValueTable(vt: DbRow, entries: ValueTableEntry[]): ValueTable {
-  return {
-    id: vt.id as string, name: vt.name as string, description: vt.description as string,
-    entries, createdAt: vt.created_at as string, updatedAt: vt.updated_at as string,
-  }
-}
-
-function mapTag(r: DbRow): Tag {
-  return { id: r.id as string, name: r.name as string, color: r.color as string, createdAt: r.created_at as string, updatedAt: r.updated_at as string }
-}
-
-function getMessageTags(db: Database, messageId: string) {
-  return (db.prepare(
-    `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
-     FROM tags t JOIN message_tags mt ON t.id = mt.tag_id
-     WHERE mt.message_id = ?`
-  ).all(messageId) as DbRow[]).map(mapTag)
-}
-
-function getSignalTags(db: Database, signalId: string) {
-  return (db.prepare(
-    `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
-     FROM tags t JOIN signal_tags st ON t.id = st.tag_id
-     WHERE st.signal_id = ?`
-  ).all(signalId) as DbRow[]).map(mapTag)
-}
-
-export default function versionRoutes(db: Database) {
+export default function versionRoutes(db: BunSQLiteDatabase<typeof schema>) {
   const app = new Hono()
-
-  function buildSnapshot(messageId: string): VersionSnapshot {
-    const msgRow = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) as DbRow
-    const signalRows = db.prepare('SELECT * FROM signals WHERE message_id = ? ORDER BY start_bit').all(messageId) as DbRow[]
-
-    const signals = signalRows.map(mapSignal)
-    const valueTableIds = [...new Set(signals.map((s) => s.valueTableId).filter(Boolean))] as string[]
-    const valueTables = valueTableIds.map((vtId) => {
-      const vt = db.prepare('SELECT * FROM value_tables WHERE id = ?').get(vtId) as DbRow
-      const entries = (db.prepare('SELECT * FROM value_table_entries WHERE value_table_id = ? ORDER BY sort_order, raw_value').all(vtId) as DbRow[]).map(mapEntry)
-      return mapValueTable(vt, entries)
-    })
-
-    const messageTags = getMessageTags(db, messageId)
-    const signalTags = signals.map((s) => ({ signalId: s.id, tags: getSignalTags(db, s.id) }))
-
-    return { message: mapMessage(msgRow), signals, valueTables, messageTags, signalTags }
-  }
 
   app.post('/', async (c) => {
     const body = await c.req.json<{ messageId: string; message: string }>()
     const id = randomUUID()
     const now = new Date().toISOString()
 
-    const snapshot = buildSnapshot(body.messageId)
+    const snapshot = buildSnapshot(db, body.messageId)
 
-    const parent = db
-      .prepare('SELECT id, snapshot FROM versions WHERE message_id = ? ORDER BY created_at DESC LIMIT 1')
-      .get(body.messageId) as { id: string; snapshot: string } | undefined
+    const parent = db.select({ id: versions.id, snapshot: versions.snapshot })
+      .from(versions)
+      .where(eq(versions.messageId, body.messageId))
+      .orderBy(desc(versions.createdAt)).limit(1).get()
 
     let diff: unknown = null
     if (parent) {
@@ -98,9 +60,11 @@ export default function versionRoutes(db: Database) {
       diff = jsondiffpatch.diff(parentSnapshot, snapshot)
     }
 
-    db.prepare(
-      `INSERT INTO versions (id, message_id, parent_id, message, snapshot, diff, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, body.messageId, parent?.id ?? null, body.message, JSON.stringify(snapshot), diff ? JSON.stringify(diff) : null, now)
+    db.insert(versions).values({
+      id, messageId: body.messageId, parentId: parent?.id ?? null,
+      message: body.message, snapshot: JSON.stringify(snapshot),
+      diff: diff ? JSON.stringify(diff) : null, createdAt: now,
+    }).run()
 
     return c.json({ id, messageId: body.messageId, parentId: parent?.id ?? null, message: body.message, createdAt: now }, 201)
   })
@@ -109,26 +73,23 @@ export default function versionRoutes(db: Database) {
     const messageId = c.req.query('messageId')
     if (!messageId) return c.json({ error: 'messageId is required' }, 400)
 
-    const rows = db
-      .prepare('SELECT id, message_id, parent_id, message, created_at FROM versions WHERE message_id = ? ORDER BY created_at DESC')
-      .all(messageId) as DbRow[]
+    const rows = db.select({
+      id: versions.id, messageId: versions.messageId,
+      parentId: versions.parentId, message: versions.message, createdAt: versions.createdAt,
+    }).from(versions).where(eq(versions.messageId, messageId)).orderBy(desc(versions.createdAt)).all()
 
-    return c.json(rows.map((r) => ({
-      id: r.id, messageId: r.message_id, parentId: r.parent_id,
-      message: r.message, createdAt: r.created_at,
-    })))
+    return c.json(rows)
   })
 
   app.get('/:id', (c) => {
     const { id } = c.req.param()
-    const row = db.prepare('SELECT * FROM versions WHERE id = ?').get(id) as DbRow | undefined
+    const row = db.select().from(versions).where(eq(versions.id, id)).get()
     if (!row) return c.json({ error: 'Version not found' }, 404)
 
     return c.json({
-      id: row.id, messageId: row.message_id, parentId: row.parent_id,
-      message: row.message, createdAt: row.created_at,
-      snapshot: JSON.parse(row.snapshot as string),
-      diff: row.diff ? JSON.parse(row.diff as string) : null,
+      ...row,
+      snapshot: JSON.parse(row.snapshot),
+      diff: row.diff ? JSON.parse(row.diff) : null,
     })
   })
 
@@ -137,12 +98,12 @@ export default function versionRoutes(db: Database) {
     const compareWith = c.req.query('compareWith')
     if (!compareWith) return c.json({ error: 'compareWith is required' }, 400)
 
-    const vA = db.prepare('SELECT * FROM versions WHERE id = ?').get(id) as DbRow | undefined
-    const vB = db.prepare('SELECT * FROM versions WHERE id = ?').get(compareWith) as DbRow | undefined
+    const vA = db.select().from(versions).where(eq(versions.id, id)).get()
+    const vB = db.select().from(versions).where(eq(versions.id, compareWith)).get()
     if (!vA || !vB) return c.json({ error: 'Version not found' }, 404)
 
-    const snapA = JSON.parse(vA.snapshot as string)
-    const snapB = JSON.parse(vB.snapshot as string)
+    const snapA = JSON.parse(vA.snapshot)
+    const snapB = JSON.parse(vB.snapshot)
     const diff = jsondiffpatch.diff(snapA, snapB)
 
     return c.json({ versionA: vA.id, versionB: vB.id, diff })
@@ -150,61 +111,68 @@ export default function versionRoutes(db: Database) {
 
   app.post('/:id/rollback', async (c) => {
     const { id } = c.req.param()
-    const row = db.prepare('SELECT * FROM versions WHERE id = ?').get(id) as DbRow | undefined
+    const row = db.select().from(versions).where(eq(versions.id, id)).get()
     if (!row) return c.json({ error: 'Version not found' }, 404)
 
-    const snapshot = JSON.parse(row.snapshot as string) as VersionSnapshot
-    const messageId = row.message_id as string | null
+    const snapshot = JSON.parse(row.snapshot) as VersionSnapshot
+    const messageId = row.messageId
     if (!messageId) return c.json({ error: 'Cannot rollback: no associated message' }, 400)
 
     const now = new Date().toISOString()
 
-    db.prepare(
-      `UPDATE messages SET name = ?, description = ?, frame_size = ?, byte_order = ?, updated_at = ? WHERE id = ?`
-    ).run(snapshot.message.name, snapshot.message.description, snapshot.message.frameSize, snapshot.message.byteOrder, now, messageId)
+    db.update(messages).set({
+      name: snapshot.message.name, description: snapshot.message.description,
+      frameSize: snapshot.message.frameSize, byteOrder: snapshot.message.byteOrder,
+      updatedAt: now,
+    }).where(eq(messages.id, messageId)).run()
 
-    db.prepare('DELETE FROM signals WHERE message_id = ?').run(messageId)
-    const insSignal = db.prepare(
-      `INSERT INTO signals (id, message_id, name, description, start_bit, bit_length, byte_order,
-         factor, offset, unit, minimum, maximum, value_table_id, data_type, color, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
+    db.delete(signals).where(eq(signals.messageId, messageId)).run()
+
     for (const s of snapshot.signals) {
-      insSignal.run(s.id, s.messageId, s.name, s.description, s.startBit, s.bitLength, s.byteOrder,
-        s.factor, s.offset, s.unit, s.minimum, s.maximum, s.valueTableId, s.dataType ?? null, s.color, s.sortOrder, s.createdAt, now)
+      db.insert(signals).values({
+        id: s.id, messageId, name: s.name, description: s.description,
+        startBit: s.startBit, bitLength: s.bitLength, byteOrder: s.byteOrder,
+        factor: s.factor, offset: s.offset, unit: s.unit,
+        minimum: s.minimum, maximum: s.maximum, valueTableId: s.valueTableId,
+        dataType: s.dataType ?? null, color: s.color, sortOrder: s.sortOrder,
+        createdAt: s.createdAt, updatedAt: now,
+      }).run()
     }
 
     // Restore signal tags
-    db.prepare('DELETE FROM signal_tags WHERE signal_id IN (SELECT id FROM signals WHERE message_id = ?)').run(messageId)
-    const insSignalTag = db.prepare('INSERT OR IGNORE INTO tags (id, name, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-    const insSignalTagLink = db.prepare('INSERT INTO signal_tags (signal_id, tag_id) VALUES (?, ?)')
+    const currentSignalIds = db.select({ id: signals.id }).from(signals).where(eq(signals.messageId, messageId)).all().map(r => r.id)
+    if (currentSignalIds.length > 0) {
+      db.delete(signalTags).where(inArray(signalTags.signalId, currentSignalIds)).run()
+    }
     for (const st of snapshot.signalTags) {
       for (const tag of st.tags) {
-        insSignalTag.run(tag.id, tag.name, tag.color, tag.createdAt, tag.updatedAt)
-        insSignalTagLink.run(st.signalId, tag.id)
+        db.insert(tags).values({ id: tag.id, name: tag.name, color: tag.color, createdAt: tag.createdAt, updatedAt: tag.updatedAt })
+          .onConflictDoNothing().run()
+        db.insert(signalTags).values({ signalId: st.signalId, tagId: tag.id }).run()
       }
     }
 
     // Restore message tags
-    db.prepare('DELETE FROM message_tags WHERE message_id = ?').run(messageId)
-    const insMessageTag = db.prepare('INSERT OR IGNORE INTO tags (id, name, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-    const insMessageTagLink = db.prepare('INSERT INTO message_tags (message_id, tag_id) VALUES (?, ?)')
+    db.delete(messageTags).where(eq(messageTags.messageId, messageId)).run()
     for (const tag of snapshot.messageTags) {
-      insMessageTag.run(tag.id, tag.name, tag.color, tag.createdAt, tag.updatedAt)
-      insMessageTagLink.run(messageId, tag.id)
+      db.insert(tags).values({ id: tag.id, name: tag.name, color: tag.color, createdAt: tag.createdAt, updatedAt: tag.updatedAt })
+        .onConflictDoNothing().run()
+      db.insert(messageTags).values({ messageId, tagId: tag.id }).run()
     }
 
     const newId = randomUUID()
-    const parent = db
-      .prepare('SELECT id FROM versions WHERE message_id = ? ORDER BY created_at DESC LIMIT 1')
-      .get(messageId) as { id: string } | undefined
+    const parent = db.select({ id: versions.id })
+      .from(versions).where(eq(versions.messageId, messageId))
+      .orderBy(desc(versions.createdAt)).limit(1).get()
 
-    const currentSnapshot = buildSnapshot(messageId)
+    const currentSnapshot = buildSnapshot(db, messageId)
     const diff = jsondiffpatch.diff(currentSnapshot, snapshot)
 
-    db.prepare(
-      `INSERT INTO versions (id, message_id, parent_id, message, snapshot, diff, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(newId, messageId, parent?.id ?? null, `Rollback to: ${row.message}`, JSON.stringify(currentSnapshot), diff ? JSON.stringify(diff) : null, now)
+    db.insert(versions).values({
+      id: newId, messageId, parentId: parent?.id ?? null,
+      message: `Rollback to: ${row.message}`, snapshot: JSON.stringify(currentSnapshot),
+      diff: diff ? JSON.stringify(diff) : null, createdAt: now,
+    }).run()
 
     return c.json({ success: true, newVersionId: newId })
   })

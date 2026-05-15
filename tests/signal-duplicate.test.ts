@@ -1,14 +1,16 @@
 import { describe, it, expect, beforeEach } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { SCHEMA_DDL } from '../server/db/schema.js'
+import { drizzle } from 'drizzle-orm/bun-sqlite'
+import * as schema from '../server/db/schema.js'
+import { runMigrations } from '../server/db/migrations.js'
 import messageRoutes from '../server/routes/messages.js'
 import signalRoutes from '../server/routes/signals.js'
 
 function createTestDb() {
-  const db = new Database(':memory:')
-  db.exec('PRAGMA foreign_keys = ON')
-  db.exec(SCHEMA_DDL)
-  db.exec(`ALTER TABLE signals ADD COLUMN data_type TEXT DEFAULT NULL;`)
+  const sqlite = new Database(':memory:')
+  sqlite.exec('PRAGMA foreign_keys = ON')
+  const db = drizzle(sqlite, { schema })
+  runMigrations(db, sqlite)
   return db
 }
 

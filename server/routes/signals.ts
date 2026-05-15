@@ -1,22 +1,13 @@
 import { Hono } from 'hono'
-import type { Database } from 'bun:sqlite'
+import { eq, and, lt, gt, ne, sql } from 'drizzle-orm'
+import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { generateSignalId } from '../../src/foundation/lib/signal-id.js'
 import type { CreateSignalInput, UpdateSignalInput } from '../../src/foundation/types.js'
+import * as schema from '../db/schema.js'
 
-interface DbRow { [key: string]: unknown }
+const { signals } = schema
 
-function mapSignal(r: DbRow) {
-  return {
-    id: r.id, messageId: r.message_id, name: r.name, description: r.description,
-    startBit: r.start_bit, bitLength: r.bit_length, byteOrder: r.byte_order,
-    factor: r.factor, offset: r.offset, unit: r.unit,
-    minimum: r.minimum, maximum: r.maximum, valueTableId: r.value_table_id,
-    dataType: r.data_type, color: r.color, sortOrder: r.sort_order,
-    createdAt: r.created_at, updatedAt: r.updated_at,
-  }
-}
-
-export default function signalRoutes(db: Database) {
+export default function signalRoutes(db: BunSQLiteDatabase<typeof schema>) {
   const app = new Hono()
 
   app.post('/messages/:messageId/signals', async (c) => {
@@ -30,21 +21,24 @@ export default function signalRoutes(db: Database) {
     }
     const now = new Date().toISOString()
 
-    const maxOrder = db
-      .prepare('SELECT MAX(sort_order) as m FROM signals WHERE message_id = ?')
-      .get(messageId) as { m: number | null }
+    const maxResult = db
+      .select({ m: sql<number | null>`MAX(${signals.sortOrder})` })
+      .from(signals)
+      .where(eq(signals.messageId, messageId))
+      .get()
+
+    const sortOrder = (maxResult?.m ?? -1) + 1
 
     try {
-      db.prepare(
-        `INSERT INTO signals (id, message_id, name, description, start_bit, bit_length, byte_order,
-           factor, offset, unit, minimum, maximum, value_table_id, data_type, color, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        id, messageId, body.name, body.description ?? '', body.startBit, body.bitLength,
-        body.byteOrder ?? 'big', body.factor ?? 1.0, body.offset ?? 0.0, body.unit ?? '',
-        body.minimum ?? null, body.maximum ?? null, body.valueTableId ?? null,
-        body.dataType ?? null, body.color ?? '#10B981', (maxOrder?.m ?? -1) + 1, now, now
-      )
+      db.insert(signals).values({
+        id, messageId, name: body.name, description: body.description ?? '',
+        startBit: body.startBit, bitLength: body.bitLength,
+        byteOrder: body.byteOrder ?? 'big', factor: body.factor ?? 1.0,
+        offset: body.offset ?? 0.0, unit: body.unit ?? '',
+        minimum: body.minimum ?? null, maximum: body.maximum ?? null,
+        valueTableId: body.valueTableId ?? null, dataType: body.dataType ?? null,
+        color: body.color ?? '#10B981', sortOrder, createdAt: now, updatedAt: now,
+      }).run()
     } catch (err: any) {
       if (err.message.includes('UNIQUE') || err.message.includes('SQLITE_CONSTRAINT')) {
         return c.json({ error: 'Signal already exists with the same name, startBit and bitLength in this message' }, 409)
@@ -52,8 +46,8 @@ export default function signalRoutes(db: Database) {
       throw err
     }
 
-    const row = db.prepare('SELECT * FROM signals WHERE id = ?').get(id) as DbRow
-    return c.json(mapSignal(row), 201)
+    const signal = db.select().from(signals).where(eq(signals.id, id)).get()
+    return c.json(signal, 201)
   })
 
   app.put('/signals/:id', async (c) => {
@@ -61,38 +55,33 @@ export default function signalRoutes(db: Database) {
     const body = await c.req.json<UpdateSignalInput>()
     const now = new Date().toISOString()
 
-    const existing = db.prepare('SELECT * FROM signals WHERE id = ?').get(id) as DbRow | undefined
+    const existing = db.select().from(signals).where(eq(signals.id, id)).get()
     if (!existing) return c.json({ error: 'Signal not found' }, 404)
 
-    db.prepare(
-      `UPDATE signals SET
-         name = COALESCE(?, name), description = COALESCE(?, description),
-         start_bit = COALESCE(?, start_bit), bit_length = COALESCE(?, bit_length),
-         byte_order = COALESCE(?, byte_order), factor = COALESCE(?, factor),
-         offset = COALESCE(?, offset), unit = COALESCE(?, unit),
-         minimum = ?, maximum = ?,
-         value_table_id = ?, data_type = ?, color = COALESCE(?, color),
-         updated_at = ?
-       WHERE id = ?`
-    ).run(
-      body.name ?? null, body.description ?? null,
-      body.startBit ?? null, body.bitLength ?? null,
-      body.byteOrder ?? null, body.factor ?? null,
-      body.offset ?? null, body.unit ?? null,
-      body.minimum !== undefined ? body.minimum : existing.minimum,
-      body.maximum !== undefined ? body.maximum : existing.maximum,
-      body.valueTableId !== undefined ? body.valueTableId : existing.value_table_id,
-      body.dataType !== undefined ? body.dataType : existing.data_type,
-      body.color ?? null, now, id
-    )
+    db.update(signals).set({
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.description !== undefined ? { description: body.description } : {}),
+      ...(body.startBit !== undefined ? { startBit: body.startBit } : {}),
+      ...(body.bitLength !== undefined ? { bitLength: body.bitLength } : {}),
+      ...(body.byteOrder !== undefined ? { byteOrder: body.byteOrder } : {}),
+      ...(body.factor !== undefined ? { factor: body.factor } : {}),
+      ...(body.offset !== undefined ? { offset: body.offset } : {}),
+      ...(body.unit !== undefined ? { unit: body.unit } : {}),
+      minimum: body.minimum !== undefined ? body.minimum : existing.minimum,
+      maximum: body.maximum !== undefined ? body.maximum : existing.maximum,
+      valueTableId: body.valueTableId !== undefined ? body.valueTableId : existing.valueTableId,
+      dataType: body.dataType !== undefined ? body.dataType : existing.dataType,
+      ...(body.color !== undefined ? { color: body.color } : {}),
+      updatedAt: now,
+    }).where(eq(signals.id, id)).run()
 
-    const row = db.prepare('SELECT * FROM signals WHERE id = ?').get(id) as DbRow
-    return c.json(mapSignal(row))
+    const signal = db.select().from(signals).where(eq(signals.id, id)).get()
+    return c.json(signal)
   })
 
   app.delete('/signals/:id', (c) => {
     const { id } = c.req.param()
-    const result = db.prepare('DELETE FROM signals WHERE id = ?').run(id)
+    const result = db.delete(signals).where(eq(signals.id, id)).run()
     if (result.changes === 0) return c.json({ error: 'Signal not found' }, 404)
     return c.json({ success: true })
   })
@@ -101,20 +90,26 @@ export default function signalRoutes(db: Database) {
     const { id } = c.req.param()
     const body = await c.req.json<{ startBit?: number; bitLength?: number }>()
 
-    const signal = db.prepare('SELECT * FROM signals WHERE id = ?').get(id) as DbRow | undefined
+    const signal = db.select().from(signals).where(eq(signals.id, id)).get()
     if (!signal) return c.json({ error: 'Signal not found' }, 404)
 
-    const startBit = body.startBit ?? signal.start_bit as number
-    const bitLength = body.bitLength ?? signal.bit_length as number
+    const startBit = body.startBit ?? signal.startBit
+    const bitLength = body.bitLength ?? signal.bitLength
 
-    const conflicts = db.prepare(
-      `SELECT id, name FROM signals
-       WHERE message_id = ? AND start_bit < ? AND start_bit + bit_length > ? AND id != ?`
-    ).all(signal.message_id, startBit + bitLength, startBit, id) as DbRow[]
+    const conflicts = db.select({ id: signals.id, name: signals.name })
+      .from(signals)
+      .where(
+        and(
+          eq(signals.messageId, signal.messageId),
+          lt(signals.startBit, startBit + bitLength),
+          gt(sql`${signals.startBit} + ${signals.bitLength}`, startBit),
+          ne(signals.id, id),
+        )
+      ).all()
 
     return c.json({
       hasOverlap: conflicts.length > 0,
-      conflictingSignals: conflicts.map((r) => ({ id: r.id, name: r.name })),
+      conflictingSignals: conflicts,
     })
   })
 

@@ -1,42 +1,33 @@
 import { Hono } from 'hono'
-import type { Database } from 'bun:sqlite'
+import { eq } from 'drizzle-orm'
+import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { randomUUID } from 'crypto'
+import * as schema from '../db/schema.js'
 
-interface DbRow { [key: string]: unknown }
+const { valueTables, valueTableEntries } = schema
 
-function mapEntry(r: DbRow) {
-  return {
-    id: r.id, valueTableId: r.value_table_id,
-    rawValue: r.raw_value, displayValue: r.display_value,
-    description: r.description, sortOrder: r.sort_order,
-  }
-}
-
-function mapTable(r: DbRow, entries: ReturnType<typeof mapEntry>[]) {
-  return {
-    id: r.id, name: r.name, description: r.description,
-    entries, createdAt: r.created_at, updatedAt: r.updated_at,
-  }
-}
-
-export default function valueTableRoutes(db: Database) {
+export default function valueTableRoutes(db: BunSQLiteDatabase<typeof schema>) {
   const app = new Hono()
 
   app.get('/', (c) => {
-    const tables = db.prepare('SELECT * FROM value_tables ORDER BY name').all() as DbRow[]
+    const tables = db.select().from(valueTables).orderBy(valueTables.name).all()
     const result = tables.map((t) => {
-      const entries = (db.prepare('SELECT * FROM value_table_entries WHERE value_table_id = ? ORDER BY sort_order, raw_value').all(t.id) as DbRow[]).map(mapEntry)
-      return mapTable(t, entries)
+      const entries = db.select().from(valueTableEntries)
+        .where(eq(valueTableEntries.valueTableId, t.id))
+        .orderBy(valueTableEntries.sortOrder, valueTableEntries.rawValue).all()
+      return { ...t, entries }
     })
     return c.json(result)
   })
 
   app.get('/:id', (c) => {
     const { id } = c.req.param()
-    const table = db.prepare('SELECT * FROM value_tables WHERE id = ?').get(id) as DbRow | undefined
+    const table = db.select().from(valueTables).where(eq(valueTables.id, id)).get()
     if (!table) return c.json({ error: 'Value table not found' }, 404)
-    const entries = (db.prepare('SELECT * FROM value_table_entries WHERE value_table_id = ? ORDER BY sort_order, raw_value').all(id) as DbRow[]).map(mapEntry)
-    return c.json(mapTable(table, entries))
+    const entries = db.select().from(valueTableEntries)
+      .where(eq(valueTableEntries.valueTableId, id))
+      .orderBy(valueTableEntries.sortOrder, valueTableEntries.rawValue).all()
+    return c.json({ ...table, entries })
   })
 
   app.post('/', async (c) => {
@@ -44,20 +35,20 @@ export default function valueTableRoutes(db: Database) {
     const id = randomUUID()
     const now = new Date().toISOString()
 
-    db.prepare(`INSERT INTO value_tables (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
-      .run(id, body.name, body.description ?? '', now, now)
+    db.insert(valueTables).values({ id, name: body.name, description: body.description ?? '', createdAt: now, updatedAt: now }).run()
 
-    const entries: ReturnType<typeof mapEntry>[] = []
+    const entries: any[] = []
     if (body.entries) {
-      const ins = db.prepare(
-        `INSERT INTO value_table_entries (id, value_table_id, raw_value, display_value, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)`
-      )
       for (let i = 0; i < body.entries.length; i++) {
         const e = body.entries[i]
         if (!e) continue
         const eid = randomUUID()
-        ins.run(eid, id, e.rawValue, e.displayValue, e.description ?? '', e.sortOrder ?? i)
-        entries.push({ id: eid, valueTableId: id, rawValue: e.rawValue, displayValue: e.displayValue, description: e.description ?? '', sortOrder: e.sortOrder ?? i })
+        const sortOrder = e.sortOrder ?? i
+        db.insert(valueTableEntries).values({
+          id: eid, valueTableId: id, rawValue: e.rawValue,
+          displayValue: e.displayValue, description: e.description ?? '', sortOrder,
+        }).run()
+        entries.push({ id: eid, valueTableId: id, rawValue: e.rawValue, displayValue: e.displayValue, description: e.description ?? '', sortOrder })
       }
     }
 
@@ -69,32 +60,37 @@ export default function valueTableRoutes(db: Database) {
     const body = await c.req.json<{ name?: string; description?: string; entries?: { rawValue: number; displayValue: string; description?: string; sortOrder?: number }[] }>()
     const now = new Date().toISOString()
 
-    const existing = db.prepare('SELECT 1 FROM value_tables WHERE id = ?').get(id)
+    const existing = db.select().from(valueTables).where(eq(valueTables.id, id)).get()
     if (!existing) return c.json({ error: 'Value table not found' }, 404)
 
-    db.prepare(`UPDATE value_tables SET name = COALESCE(?, name), description = COALESCE(?, description), updated_at = ? WHERE id = ?`)
-      .run(body.name ?? null, body.description ?? null, now, id)
+    db.update(valueTables).set({
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.description !== undefined ? { description: body.description } : {}),
+      updatedAt: now,
+    }).where(eq(valueTables.id, id)).run()
 
     if (body.entries) {
-      db.prepare('DELETE FROM value_table_entries WHERE value_table_id = ?').run(id)
-      const ins = db.prepare(
-        `INSERT INTO value_table_entries (id, value_table_id, raw_value, display_value, description, sort_order) VALUES (?, ?, ?, ?, ?, ?)`
-      )
+      db.delete(valueTableEntries).where(eq(valueTableEntries.valueTableId, id)).run()
       for (let i = 0; i < body.entries.length; i++) {
         const e = body.entries[i]
         if (!e) continue
-        ins.run(randomUUID(), id, e.rawValue, e.displayValue, e.description ?? '', e.sortOrder ?? i)
+        db.insert(valueTableEntries).values({
+          id: randomUUID(), valueTableId: id, rawValue: e.rawValue,
+          displayValue: e.displayValue, description: e.description ?? '', sortOrder: e.sortOrder ?? i,
+        }).run()
       }
     }
 
-    const table = db.prepare('SELECT * FROM value_tables WHERE id = ?').get(id) as DbRow
-    const entries = (db.prepare('SELECT * FROM value_table_entries WHERE value_table_id = ? ORDER BY sort_order, raw_value').all(id) as DbRow[]).map(mapEntry)
-    return c.json(mapTable(table, entries))
+    const table = db.select().from(valueTables).where(eq(valueTables.id, id)).get()
+    const entries = db.select().from(valueTableEntries)
+      .where(eq(valueTableEntries.valueTableId, id))
+      .orderBy(valueTableEntries.sortOrder, valueTableEntries.rawValue).all()
+    return c.json({ ...table, entries })
   })
 
   app.delete('/:id', (c) => {
     const { id } = c.req.param()
-    const result = db.prepare('DELETE FROM value_tables WHERE id = ?').run(id)
+    const result = db.delete(valueTables).where(eq(valueTables.id, id)).run()
     if (result.changes === 0) return c.json({ error: 'Value table not found' }, 404)
     return c.json({ success: true })
   })

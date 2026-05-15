@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.14.1",
+    "drizzle-orm": "^0.44.2",
     "hono": "^4.7.9",
     "jsondiffpatch": "^0.6.0",
     "lucide-react": "^0.510.0",
@@ -32,6 +33,7 @@
     "@vitejs/plugin-react": "^4.4.1",
     "concurrently": "^9.1.2",
     "dependency-cruiser": "^17.4.0",
+    "drizzle-kit": "^0.31.1",
     "playwright": "^1.60.0",
     "tailwindcss": "^4.1.5",
     "tsx": "^4.19.4",

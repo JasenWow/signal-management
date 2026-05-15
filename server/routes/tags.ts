@@ -1,27 +1,19 @@
 import { Hono } from 'hono'
-import type { Database } from 'bun:sqlite'
+import { eq, and } from 'drizzle-orm'
+import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { randomUUID } from 'crypto'
 import type { CreateTagInput, UpdateTagInput } from '../../src/foundation/types.js'
 import { DEFAULT_TAG_COLORS } from '../../src/foundation/lib/constants.js'
+import * as schema from '../db/schema.js'
 
-interface DbRow { [key: string]: unknown }
+const { tags, signals, signalTags, messageTags, messages } = schema
 
-function mapTag(r: DbRow) {
-  return {
-    id: r.id,
-    name: r.name,
-    color: r.color,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  }
-}
-
-export default function tagRoutes(db: Database) {
+export default function tagRoutes(db: BunSQLiteDatabase<typeof schema>) {
   const app = new Hono()
 
   app.get('/', (c) => {
-    const rows = db.prepare('SELECT * FROM tags ORDER BY name').all() as DbRow[]
-    return c.json(rows.map(mapTag))
+    const rows = db.select().from(tags).orderBy(tags.name).all()
+    return c.json(rows)
   })
 
   app.post('/', async (c) => {
@@ -34,15 +26,13 @@ export default function tagRoutes(db: Database) {
     const color = body.color ?? DEFAULT_TAG_COLORS[0]
 
     try {
-      db.prepare(
-        `INSERT INTO tags (id, name, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
-      ).run(id, body.name.trim(), color, now, now)
+      db.insert(tags).values({ id, name: body.name.trim(), color, createdAt: now, updatedAt: now }).run()
     } catch {
       return c.json({ error: 'Tag name already exists' }, 409)
     }
 
-    const row = db.prepare('SELECT * FROM tags WHERE id = ?').get(id) as DbRow
-    return c.json(mapTag(row), 201)
+    const tag = db.select().from(tags).where(eq(tags.id, id)).get()
+    return c.json(tag, 201)
   })
 
   app.put('/:id', async (c) => {
@@ -50,20 +40,22 @@ export default function tagRoutes(db: Database) {
     const body = await c.req.json<UpdateTagInput>()
     const now = new Date().toISOString()
 
-    const existing = db.prepare('SELECT * FROM tags WHERE id = ?').get(id) as DbRow | undefined
+    const existing = db.select().from(tags).where(eq(tags.id, id)).get()
     if (!existing) return c.json({ error: 'Tag not found' }, 404)
 
-    db.prepare(
-      `UPDATE tags SET name = COALESCE(?, name), color = COALESCE(?, color), updated_at = ? WHERE id = ?`
-    ).run(body.name?.trim() ?? null, body.color ?? null, now, id)
+    db.update(tags).set({
+      ...(body.name !== undefined ? { name: body.name.trim() } : {}),
+      ...(body.color !== undefined ? { color: body.color } : {}),
+      updatedAt: now,
+    }).where(eq(tags.id, id)).run()
 
-    const row = db.prepare('SELECT * FROM tags WHERE id = ?').get(id) as DbRow
-    return c.json(mapTag(row))
+    const tag = db.select().from(tags).where(eq(tags.id, id)).get()
+    return c.json(tag)
   })
 
   app.delete('/:id', (c) => {
     const { id } = c.req.param()
-    const result = db.prepare('DELETE FROM tags WHERE id = ?').run(id)
+    const result = db.delete(tags).where(eq(tags.id, id)).run()
     if (result.changes === 0) return c.json({ error: 'Tag not found' }, 404)
     return c.json({ success: true })
   })
@@ -72,12 +64,11 @@ export default function tagRoutes(db: Database) {
     const { signalId } = c.req.param()
     const body = await c.req.json<{ tagIds: string[] }>()
 
-    const signal = db.prepare('SELECT id FROM signals WHERE id = ?').get(signalId)
+    const signal = db.select({ id: signals.id }).from(signals).where(eq(signals.id, signalId)).get()
     if (!signal) return c.json({ error: 'Signal not found' }, 404)
 
-    const insert = db.prepare('INSERT OR IGNORE INTO signal_tags (signal_id, tag_id) VALUES (?, ?)')
     for (const tagId of body.tagIds ?? []) {
-      insert.run(signalId, tagId)
+      db.insert(signalTags).values({ signalId, tagId }).onConflictDoNothing().run()
     }
 
     return c.json({ success: true })
@@ -85,7 +76,7 @@ export default function tagRoutes(db: Database) {
 
   app.delete('/signals/:signalId/tags/:tagId', (c) => {
     const { signalId, tagId } = c.req.param()
-    db.prepare('DELETE FROM signal_tags WHERE signal_id = ? AND tag_id = ?').run(signalId, tagId)
+    db.delete(signalTags).where(and(eq(signalTags.signalId, signalId), eq(signalTags.tagId, tagId))).run()
     return c.json({ success: true })
   })
 
@@ -93,12 +84,11 @@ export default function tagRoutes(db: Database) {
     const { messageId } = c.req.param()
     const body = await c.req.json<{ tagIds: string[] }>()
 
-    const message = db.prepare('SELECT id FROM messages WHERE id = ?').get(messageId)
+    const message = db.select({ id: messages.id }).from(messages).where(eq(messages.id, messageId)).get()
     if (!message) return c.json({ error: 'Message not found' }, 404)
 
-    const insert = db.prepare('INSERT OR IGNORE INTO message_tags (message_id, tag_id) VALUES (?, ?)')
     for (const tagId of body.tagIds ?? []) {
-      insert.run(messageId, tagId)
+      db.insert(messageTags).values({ messageId, tagId }).onConflictDoNothing().run()
     }
 
     return c.json({ success: true })
@@ -106,7 +96,7 @@ export default function tagRoutes(db: Database) {
 
   app.delete('/messages/:messageId/tags/:tagId', (c) => {
     const { messageId, tagId } = c.req.param()
-    db.prepare('DELETE FROM message_tags WHERE message_id = ? AND tag_id = ?').run(messageId, tagId)
+    db.delete(messageTags).where(and(eq(messageTags.messageId, messageId), eq(messageTags.tagId, tagId))).run()
     return c.json({ success: true })
   })
 
@@ -114,46 +104,25 @@ export default function tagRoutes(db: Database) {
     const tagId = c.req.query('tagId')
     if (!tagId) return c.json({ error: 'tagId query required' }, 400)
 
-    const rows = db.prepare(
-      `SELECT s.* FROM signals s
-       JOIN signal_tags st ON s.id = st.signal_id
-       WHERE st.tag_id = ?`
-    ).all(tagId) as DbRow[]
+    const rows = db.select()
+      .from(signals)
+      .innerJoin(signalTags, eq(signals.id, signalTags.signalId))
+      .where(eq(signalTags.tagId, tagId)).all()
 
-    return c.json(rows.map(mapSignal))
+    return c.json(rows.map(r => r.signals))
   })
 
   app.get('/messages', (c) => {
     const tagId = c.req.query('tagId')
     if (!tagId) return c.json({ error: 'tagId query required' }, 400)
 
-    const rows = db.prepare(
-      `SELECT m.* FROM messages m
-       JOIN message_tags mt ON m.id = mt.message_id
-       WHERE mt.tag_id = ?`
-    ).all(tagId) as DbRow[]
+    const rows = db.select()
+      .from(messages)
+      .innerJoin(messageTags, eq(messages.id, messageTags.messageId))
+      .where(eq(messageTags.tagId, tagId)).all()
 
-    return c.json(rows.map(mapMessage))
+    return c.json(rows.map(r => r.messages))
   })
 
   return app
-}
-
-function mapSignal(r: DbRow) {
-  return {
-    id: r.id, messageId: r.message_id, name: r.name, description: r.description,
-    startBit: r.start_bit, bitLength: r.bit_length, byteOrder: r.byte_order,
-    factor: r.factor, offset: r.offset, unit: r.unit,
-    minimum: r.minimum, maximum: r.maximum, valueTableId: r.value_table_id,
-    dataType: r.data_type, color: r.color, sortOrder: r.sort_order,
-    createdAt: r.created_at, updatedAt: r.updated_at,
-  }
-}
-
-function mapMessage(r: DbRow) {
-  return {
-    id: r.id, name: r.name, description: r.description,
-    frameSize: r.frame_size, byteOrder: r.byte_order,
-    createdAt: r.created_at, updatedAt: r.updated_at,
-  }
 }

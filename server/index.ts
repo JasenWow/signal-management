@@ -16,8 +16,8 @@ const app = new Hono()
 app.use('/*', cors())
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
-const db = initDb('./data/signal-mgmt.db')
-runMigrations(db)
+const { db, sqlite } = initDb('./data/signal-mgmt.db')
+runMigrations(db, sqlite)
 
 app.route('/api/messages', messageRoutes(db))
 app.route('/api', signalRoutes(db))
@@ -39,7 +39,7 @@ app.get('*', (c) => {
   }
 })
 
-const port = 3001
+const port = 3002
 serve({ fetch: app.fetch, port }, () => {
   console.log(`API server running on http://localhost:${port}`)
 })

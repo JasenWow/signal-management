@@ -1,96 +1,94 @@
-export const SCHEMA_DDL = `
-CREATE TABLE IF NOT EXISTS _migrations (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  name        TEXT NOT NULL UNIQUE,
-  applied_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
+import { sqliteTable, text, integer, real, index, primaryKey } from 'drizzle-orm/sqlite-core'
 
-CREATE TABLE IF NOT EXISTS messages (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  frame_size  INTEGER NOT NULL,
-  byte_order  TEXT NOT NULL DEFAULT 'big',
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
+export const messages = sqliteTable('messages', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  frameSize: integer('frame_size').notNull(),
+  byteOrder: text('byte_order').notNull().default('big'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: text('created_at').notNull().default("(datetime('now'))"),
+  updatedAt: text('updated_at').notNull().default("(datetime('now'))"),
+})
 
-CREATE TABLE IF NOT EXISTS signals (
-  id              TEXT PRIMARY KEY,
-  message_id      TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-  name            TEXT NOT NULL,
-  description     TEXT NOT NULL DEFAULT '',
-  start_bit       INTEGER NOT NULL,
-  bit_length      INTEGER NOT NULL,
-  byte_order      TEXT NOT NULL DEFAULT 'big',
-  factor          REAL NOT NULL DEFAULT 1.0,
-  offset          REAL NOT NULL DEFAULT 0.0,
-  unit            TEXT NOT NULL DEFAULT '',
-  minimum         REAL,
-  maximum         REAL,
-  value_table_id  TEXT REFERENCES value_tables(id) ON DELETE SET NULL,
-  color           TEXT NOT NULL DEFAULT '#10B981',
-  sort_order      INTEGER NOT NULL DEFAULT 0,
-  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
-);
+export const valueTables = sqliteTable('value_tables', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  createdAt: text('created_at').notNull().default("(datetime('now'))"),
+  updatedAt: text('updated_at').notNull().default("(datetime('now'))"),
+})
 
-CREATE TABLE IF NOT EXISTS value_tables (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
+export const signals = sqliteTable('signals', {
+  id: text('id').primaryKey(),
+  messageId: text('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  startBit: integer('start_bit').notNull(),
+  bitLength: integer('bit_length').notNull(),
+  byteOrder: text('byte_order').notNull().default('big'),
+  factor: real('factor').notNull().default(1.0),
+  offset: real('offset').notNull().default(0.0),
+  unit: text('unit').notNull().default(''),
+  minimum: real('minimum'),
+  maximum: real('maximum'),
+  valueTableId: text('value_table_id').references(() => valueTables.id, { onDelete: 'set null' }),
+  dataType: text('data_type'),
+  color: text('color').notNull().default('#10B981'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: text('created_at').notNull().default("(datetime('now'))"),
+  updatedAt: text('updated_at').notNull().default("(datetime('now'))"),
+}, (t) => [
+  index('idx_signals_message').on(t.messageId),
+  index('idx_signals_start_bit').on(t.messageId, t.startBit),
+])
 
-CREATE TABLE IF NOT EXISTS value_table_entries (
-  id              TEXT PRIMARY KEY,
-  value_table_id  TEXT NOT NULL REFERENCES value_tables(id) ON DELETE CASCADE,
-  raw_value       INTEGER NOT NULL,
-  display_value   TEXT NOT NULL,
-  description     TEXT NOT NULL DEFAULT '',
-  sort_order      INTEGER NOT NULL DEFAULT 0
-);
+export const valueTableEntries = sqliteTable('value_table_entries', {
+  id: text('id').primaryKey(),
+  valueTableId: text('value_table_id').notNull().references(() => valueTables.id, { onDelete: 'cascade' }),
+  rawValue: integer('raw_value').notNull(),
+  displayValue: text('display_value').notNull(),
+  description: text('description').notNull().default(''),
+  sortOrder: integer('sort_order').notNull().default(0),
+}, (t) => [
+  index('idx_vte_table').on(t.valueTableId),
+])
 
-CREATE TABLE IF NOT EXISTS versions (
-  id          TEXT PRIMARY KEY,
-  message_id  TEXT REFERENCES messages(id) ON DELETE SET NULL,
-  parent_id   TEXT REFERENCES versions(id),
-  message     TEXT NOT NULL DEFAULT '',
-  snapshot    TEXT NOT NULL,
-  diff        TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
+export const versions = sqliteTable('versions', {
+  id: text('id').primaryKey(),
+  messageId: text('message_id').references(() => messages.id, { onDelete: 'set null' }),
+  parentId: text('parent_id').references((): any => versions.id),
+  message: text('message').notNull().default(''),
+  snapshot: text('snapshot').notNull(),
+  diff: text('diff'),
+  createdAt: text('created_at').notNull().default("(datetime('now'))"),
+}, (t) => [
+  index('idx_versions_message').on(t.messageId),
+  index('idx_versions_created').on(t.createdAt),
+])
 
-CREATE INDEX IF NOT EXISTS idx_signals_message ON signals(message_id);
-CREATE INDEX IF NOT EXISTS idx_signals_start_bit ON signals(message_id, start_bit);
-CREATE INDEX IF NOT EXISTS idx_versions_message ON versions(message_id);
-CREATE INDEX IF NOT EXISTS idx_versions_created ON versions(created_at);
-CREATE INDEX IF NOT EXISTS idx_vte_table ON value_table_entries(value_table_id);
+export const tags = sqliteTable('tags', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().unique(),
+  color: text('color').notNull().default('#6B7280'),
+  createdAt: text('created_at').notNull().default("(datetime('now'))"),
+  updatedAt: text('updated_at').notNull().default("(datetime('now'))"),
+})
 
-CREATE TABLE IF NOT EXISTS tags (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL UNIQUE,
-  color       TEXT NOT NULL DEFAULT '#6B7280',
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
+export const signalTags = sqliteTable('signal_tags', {
+  signalId: text('signal_id').notNull().references(() => signals.id, { onDelete: 'cascade' }),
+  tagId: text('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
+}, (t) => [
+  primaryKey({ columns: [t.signalId, t.tagId] }),
+  index('idx_signal_tags_signal').on(t.signalId),
+  index('idx_signal_tags_tag').on(t.tagId),
+])
 
-CREATE TABLE IF NOT EXISTS signal_tags (
-  signal_id   TEXT NOT NULL REFERENCES signals(id) ON DELETE CASCADE,
-  tag_id      TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-  PRIMARY KEY (signal_id, tag_id)
-);
-
-CREATE TABLE IF NOT EXISTS message_tags (
-  message_id  TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-  tag_id      TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-  PRIMARY KEY (message_id, tag_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_signal_tags_signal ON signal_tags(signal_id);
-CREATE INDEX IF NOT EXISTS idx_signal_tags_tag ON signal_tags(tag_id);
-CREATE INDEX IF NOT EXISTS idx_message_tags_message ON message_tags(message_id);
-CREATE INDEX IF NOT EXISTS idx_message_tags_tag ON message_tags(tag_id);
-`
+export const messageTags = sqliteTable('message_tags', {
+  messageId: text('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  tagId: text('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
+}, (t) => [
+  primaryKey({ columns: [t.messageId, t.tagId] }),
+  index('idx_message_tags_message').on(t.messageId),
+  index('idx_message_tags_tag').on(t.tagId),
+])

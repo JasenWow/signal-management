@@ -1,73 +1,44 @@
 import { Hono } from 'hono'
-import type { Database } from 'bun:sqlite'
+import { eq, and } from 'drizzle-orm'
+import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { randomUUID } from 'crypto'
 import { generateSignalId } from '../../src/foundation/lib/signal-id.js'
-import type { CreateMessageInput, UpdateMessageInput, Message, Signal, Tag } from '../../src/foundation/types.js'
+import type { CreateMessageInput, UpdateMessageInput } from '../../src/foundation/types.js'
+import * as schema from '../db/schema.js'
 
-interface DbRow { [key: string]: unknown }
+const { messages, signals, tags, signalTags, messageTags } = schema
 
-function mapMessage(r: DbRow): Message {
-  return {
-    id: r.id as string, name: r.name as string, description: r.description as string,
-    frameSize: r.frame_size as number, byteOrder: r.byte_order as Message['byteOrder'],
-    createdAt: r.created_at as string, updatedAt: r.updated_at as string,
-  }
+function getSignalTags(db: BunSQLiteDatabase<typeof schema>, signalId: string) {
+  return db.select({ id: tags.id, name: tags.name, color: tags.color, createdAt: tags.createdAt, updatedAt: tags.updatedAt })
+    .from(tags).innerJoin(signalTags, eq(tags.id, signalTags.tagId))
+    .where(eq(signalTags.signalId, signalId)).all()
 }
 
-function mapTag(r: DbRow): Tag {
-  return { id: r.id as string, name: r.name as string, color: r.color as string, createdAt: r.created_at as string, updatedAt: r.updated_at as string }
+function getMessageTags(db: BunSQLiteDatabase<typeof schema>, messageId: string) {
+  return db.select({ id: tags.id, name: tags.name, color: tags.color, createdAt: tags.createdAt, updatedAt: tags.updatedAt })
+    .from(tags).innerJoin(messageTags, eq(tags.id, messageTags.tagId))
+    .where(eq(messageTags.messageId, messageId)).all()
 }
 
-function getSignalTags(db: Database, signalId: string): Tag[] {
-  return (db.prepare(
-    `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
-     FROM tags t JOIN signal_tags st ON t.id = st.tag_id
-     WHERE st.signal_id = ?`
-  ).all(signalId) as DbRow[]).map(mapTag)
-}
-
-function getMessageTags(db: Database, messageId: string): Tag[] {
-  return (db.prepare(
-    `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
-     FROM tags t JOIN message_tags mt ON t.id = mt.tag_id
-     WHERE mt.message_id = ?`
-  ).all(messageId) as DbRow[]).map(mapTag)
-}
-
-function mapSignal(r: DbRow): Signal {
-  return {
-    id: r.id as string, messageId: r.message_id as string, name: r.name as string, description: r.description as string,
-    startBit: r.start_bit as number, bitLength: r.bit_length as number, byteOrder: r.byte_order as Signal['byteOrder'],
-    factor: r.factor as number, offset: r.offset as number, unit: r.unit as string,
-    minimum: r.minimum as number | null, maximum: r.maximum as number | null, valueTableId: r.value_table_id as string | null,
-    dataType: r.data_type as Signal['dataType'], color: r.color as string, sortOrder: r.sort_order as number,
-    createdAt: r.created_at as string, updatedAt: r.updated_at as string,
-  }
-}
-
-export default function messageRoutes(db: Database) {
+export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
   const app = new Hono()
 
   app.get('/', (c) => {
-    const rows = db.prepare('SELECT * FROM messages ORDER BY sort_order, created_at DESC').all() as DbRow[]
-    const messagesWithTags = rows.map((r) => {
-      const msg = mapMessage(r)
-      return { ...msg, tags: getMessageTags(db, msg.id) }
-    })
+    const rows = db.select().from(messages).orderBy(messages.sortOrder, messages.createdAt).all()
+    const messagesWithTags = rows.map((msg) => ({
+      ...msg, tags: getMessageTags(db, msg.id),
+    }))
     return c.json(messagesWithTags)
   })
 
   app.get('/:id', (c) => {
     const { id } = c.req.param()
-    const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as DbRow | undefined
+    const row = db.select().from(messages).where(eq(messages.id, id)).get()
     if (!row) return c.json({ error: 'Message not found' }, 404)
 
-    const signalRows = db.prepare('SELECT * FROM signals WHERE message_id = ? ORDER BY start_bit').all(id) as DbRow[]
-    const signalsWithTags = signalRows.map((r) => {
-      const signal = mapSignal(r)
-      return { ...signal, tags: getSignalTags(db, signal.id) }
-    })
-    return c.json({ ...mapMessage(row), signals: signalsWithTags, tags: getMessageTags(db, id) })
+    const signalRows = db.select().from(signals).where(eq(signals.messageId, id)).orderBy(signals.startBit).all()
+    const signalsWithTags = signalRows.map((s) => ({ ...s, tags: getSignalTags(db, s.id) }))
+    return c.json({ ...row, signals: signalsWithTags, tags: getMessageTags(db, id) })
   })
 
   app.post('/', async (c) => {
@@ -75,13 +46,14 @@ export default function messageRoutes(db: Database) {
     const id = randomUUID()
     const now = new Date().toISOString()
 
-    db.prepare(
-      `INSERT INTO messages (id, name, description, frame_size, byte_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, body.name, body.description ?? '', body.frameSize, body.byteOrder ?? 'big', now, now)
+    db.insert(messages).values({
+      id, name: body.name, description: body.description ?? '',
+      frameSize: body.frameSize, byteOrder: body.byteOrder ?? 'big',
+      createdAt: now, updatedAt: now,
+    }).run()
 
-    const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as DbRow
-    return c.json(mapMessage(row), 201)
+    const row = db.select().from(messages).where(eq(messages.id, id)).get()
+    return c.json(row, 201)
   })
 
   app.put('/:id', async (c) => {
@@ -89,24 +61,24 @@ export default function messageRoutes(db: Database) {
     const body = await c.req.json<UpdateMessageInput>()
     const now = new Date().toISOString()
 
-    const existing = db.prepare('SELECT 1 FROM messages WHERE id = ?').get(id)
+    const existing = db.select().from(messages).where(eq(messages.id, id)).get()
     if (!existing) return c.json({ error: 'Message not found' }, 404)
 
-    db.prepare(
-      `UPDATE messages SET
-         name = COALESCE(?, name), description = COALESCE(?, description),
-         frame_size = COALESCE(?, frame_size), byte_order = COALESCE(?, byte_order),
-         updated_at = ?
-       WHERE id = ?`
-    ).run(body.name ?? null, body.description ?? null, body.frameSize ?? null, body.byteOrder ?? null, now, id)
+    db.update(messages).set({
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.description !== undefined ? { description: body.description } : {}),
+      ...(body.frameSize !== undefined ? { frameSize: body.frameSize } : {}),
+      ...(body.byteOrder !== undefined ? { byteOrder: body.byteOrder } : {}),
+      updatedAt: now,
+    }).where(eq(messages.id, id)).run()
 
-    const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as DbRow
-    return c.json(mapMessage(row))
+    const row = db.select().from(messages).where(eq(messages.id, id)).get()
+    return c.json(row)
   })
 
   app.delete('/:id', (c) => {
     const { id } = c.req.param()
-    const result = db.prepare('DELETE FROM messages WHERE id = ?').run(id)
+    const result = db.delete(messages).where(eq(messages.id, id)).run()
     if (result.changes === 0) return c.json({ error: 'Message not found' }, 404)
     return c.json({ success: true })
   })
@@ -124,51 +96,47 @@ export default function messageRoutes(db: Database) {
     const messageId = randomUUID()
     const now = new Date().toISOString()
 
-    db.prepare(
-      `INSERT INTO messages (id, name, description, frame_size, byte_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(messageId, body.message.name, body.message.description ?? '', body.message.frameSize, body.message.byteOrder ?? 'big', now, now)
-
-    const signalInsert = db.prepare(
-      `INSERT INTO signals (id, message_id, name, description, start_bit, bit_length, byte_order,
-         factor, offset, unit, minimum, maximum, value_table_id, color, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-
-    const insertSignals = db.transaction((signals: typeof body.signals) => {
-      const conflictingSignals: string[] = []
-      for (let i = 0; i < signals.length; i++) {
-        const s = signals[i]
-        let signalId: string
-        try {
-          signalId = generateSignalId(messageId, s.name, s.startBit, s.bitLength)
-        } catch (err: any) {
-          throw Object.assign(new Error(`Invalid signal "${s.name}": ${err.message}`), { status: 400 })
-        }
-        try {
-          signalInsert.run(
-            signalId, messageId, s.name, s.description ?? '', s.startBit, s.bitLength,
-            s.byteOrder ?? 'big', s.factor ?? 1.0, s.offset ?? 0.0, s.unit ?? '',
-            s.minimum ?? null, s.maximum ?? null, null,
-            s.color ?? '#10B981', s.sortOrder ?? i, now, now
-          )
-        } catch (err: any) {
-          if (err.message.includes('UNIQUE') || err.message.includes('SQLITE_CONSTRAINT')) {
-            conflictingSignals.push(s.name)
-          }
-          throw err
-        }
-      }
-      if (conflictingSignals.length > 0) {
-        throw Object.assign(
-          new Error(`Signal(s) ${conflictingSignals.map(n => `"${n}"`).join(', ')} already exist in this message`),
-          { conflictingSignals, status: 409 }
-        )
-      }
-    })
+    db.insert(messages).values({
+      id: messageId, name: body.message.name, description: body.message.description ?? '',
+      frameSize: body.message.frameSize, byteOrder: body.message.byteOrder ?? 'big',
+      createdAt: now, updatedAt: now,
+    }).run()
 
     try {
-      insertSignals(body.signals)
+      db.transaction((tx) => {
+        const conflictingSignals: string[] = []
+        for (let i = 0; i < body.signals.length; i++) {
+          const s = body.signals[i]
+          let signalId: string
+          try {
+            signalId = generateSignalId(messageId, s.name, s.startBit, s.bitLength)
+          } catch (err: any) {
+            throw Object.assign(new Error(`Invalid signal "${s.name}": ${err.message}`), { status: 400 })
+          }
+          try {
+            tx.insert(signals).values({
+              id: signalId, messageId, name: s.name, description: s.description ?? '',
+              startBit: s.startBit, bitLength: s.bitLength,
+              byteOrder: s.byteOrder ?? 'big', factor: s.factor ?? 1.0,
+              offset: s.offset ?? 0.0, unit: s.unit ?? '',
+              minimum: s.minimum ?? null, maximum: s.maximum ?? null,
+              valueTableId: null, color: s.color ?? '#10B981',
+              sortOrder: s.sortOrder ?? i, createdAt: now, updatedAt: now,
+            }).run()
+          } catch (err: any) {
+            if (err.message.includes('UNIQUE') || err.message.includes('SQLITE_CONSTRAINT')) {
+              conflictingSignals.push(s.name)
+            }
+            throw err
+          }
+        }
+        if (conflictingSignals.length > 0) {
+          throw Object.assign(
+            new Error(`Signal(s) ${conflictingSignals.map(n => `"${n}"`).join(', ')} already exist in this message`),
+            { conflictingSignals, status: 409 }
+          )
+        }
+      })
     } catch (err: any) {
       if (err.status === 409) {
         return c.json({ error: err.message, conflictingSignals: err.conflictingSignals }, 409)
@@ -179,9 +147,9 @@ export default function messageRoutes(db: Database) {
       return c.json({ error: err.message }, 500)
     }
 
-    const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) as DbRow
-    const signalRows = db.prepare('SELECT * FROM signals WHERE message_id = ? ORDER BY start_bit').all(messageId) as DbRow[]
-    return c.json({ ...mapMessage(row), signals: signalRows.map(mapSignal) }, 201)
+    const row = db.select().from(messages).where(eq(messages.id, messageId)).get()
+    const signalRows = db.select().from(signals).where(eq(signals.messageId, messageId)).orderBy(signals.startBit).all()
+    return c.json({ ...row, signals: signalRows }, 201)
   })
 
   return app
