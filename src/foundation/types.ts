@@ -1,5 +1,5 @@
 export type ByteOrder = 'big' | 'little'
-export type SignalDataType = 'uint8' | 'int8' | 'uint16' | 'int16' | 'uint32' | 'int32' | 'uint64' | 'int64' | 'float32' | 'float64' | 'boolean'
+export type SignalDataType = 'uint8' | 'int8' | 'uint16' | 'int16' | 'uint32' | 'int32' | 'uint64' | 'int64' | 'float32' | 'float64' | 'boolean' | 'bcd_time'
 export type BitNumbering = 'msb0' | 'lsb0'
 
 export interface Message {

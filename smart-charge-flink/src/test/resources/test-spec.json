@@ -1,0 +1,66 @@
+{
+  "version": 2,
+  "message": {
+    "name": "TestFrame",
+    "frameSize": 8,
+    "byteOrder": "big"
+  },
+  "signalGroups": [],
+  "signals": [
+    {
+      "name": "EngineRPM",
+      "startBit": 0,
+      "bitLength": 16,
+      "factor": 0.25,
+      "offset": 0,
+      "unit": "rpm",
+      "dataType": "uint16",
+      "byteOrder": "big"
+    },
+    {
+      "name": "CoolantTemp",
+      "startBit": 16,
+      "bitLength": 8,
+      "factor": 1.0,
+      "offset": -40,
+      "unit": "C",
+      "dataType": "int8",
+      "byteOrder": "big"
+    },
+    {
+      "name": "VehicleSpeed",
+      "startBit": 24,
+      "bitLength": 16,
+      "factor": 0.01,
+      "offset": 0,
+      "unit": "km/h",
+      "dataType": "uint16",
+      "byteOrder": "big"
+    },
+    {
+      "name": "IsRunning",
+      "startBit": 40,
+      "bitLength": 1,
+      "factor": 1.0,
+      "offset": 0,
+      "dataType": "boolean"
+    },
+    {
+      "name": "Gear",
+      "startBit": 41,
+      "bitLength": 3,
+      "factor": 1.0,
+      "offset": 0,
+      "dataType": "uint8"
+    },
+    {
+      "name": "ErrorCode",
+      "startBit": 48,
+      "bitLength": 16,
+      "factor": 1.0,
+      "offset": 0,
+      "dataType": "int16",
+      "byteOrder": "big"
+    }
+  ]
+}

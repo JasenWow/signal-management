@@ -224,6 +224,7 @@ export function SignalForm({ mode, onClose }: SignalFormProps) {
               </optgroup>
               <optgroup label="其他">
                 <option value="boolean">boolean</option>
+                <option value="bcd_time">bcd_time (BCD时间码)</option>
               </optgroup>
             </select>
           </div>

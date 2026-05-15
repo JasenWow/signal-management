@@ -10,7 +10,7 @@ export const DEFAULT_SIGNAL_COLORS = [
   '#6D28D9', '#9333EA', '#0E7490', '#C2410C',
 ]
 
-export const SIGNAL_DATA_TYPES = ['uint8', 'int8', 'uint16', 'int16', 'uint32', 'int32', 'uint64', 'int64', 'float32', 'float64', 'boolean'] as const
+export const SIGNAL_DATA_TYPES = ['uint8', 'int8', 'uint16', 'int16', 'uint32', 'int32', 'uint64', 'int64', 'float32', 'float64', 'boolean', 'bcd_time'] as const
 
 export const DATA_TYPE_BIT_LENGTH_MAP = {
   uint8: 8,
@@ -24,6 +24,7 @@ export const DATA_TYPE_BIT_LENGTH_MAP = {
   float32: 32,
   float64: 64,
   boolean: 1,
+  bcd_time: 24,
 } as const
 
 export const DEFAULT_TAG_COLORS = [
