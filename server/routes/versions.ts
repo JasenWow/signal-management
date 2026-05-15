@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type Database from 'better-sqlite3'
+import type { Database } from 'bun:sqlite'
 import { randomUUID } from 'crypto'
 import * as jsondiffpatch from 'jsondiffpatch'
 import type { VersionSnapshot, Message, Signal, Tag, ValueTable, ValueTableEntry } from '../../src/foundation/types.js'
@@ -44,7 +44,7 @@ function mapTag(r: DbRow): Tag {
   return { id: r.id as string, name: r.name as string, color: r.color as string, createdAt: r.created_at as string, updatedAt: r.updated_at as string }
 }
 
-function getMessageTags(db: Database.Database, messageId: string) {
+function getMessageTags(db: Database, messageId: string) {
   return (db.prepare(
     `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
      FROM tags t JOIN message_tags mt ON t.id = mt.tag_id
@@ -52,7 +52,7 @@ function getMessageTags(db: Database.Database, messageId: string) {
   ).all(messageId) as DbRow[]).map(mapTag)
 }
 
-function getSignalTags(db: Database.Database, signalId: string) {
+function getSignalTags(db: Database, signalId: string) {
   return (db.prepare(
     `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
      FROM tags t JOIN signal_tags st ON t.id = st.tag_id
@@ -60,7 +60,7 @@ function getSignalTags(db: Database.Database, signalId: string) {
   ).all(signalId) as DbRow[]).map(mapTag)
 }
 
-export default function versionRoutes(db: Database.Database) {
+export default function versionRoutes(db: Database) {
   const app = new Hono()
 
   function buildSnapshot(messageId: string): VersionSnapshot {

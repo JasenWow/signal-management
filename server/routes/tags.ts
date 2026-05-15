@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type Database from 'better-sqlite3'
+import type { Database } from 'bun:sqlite'
 import { randomUUID } from 'crypto'
 import type { CreateTagInput, UpdateTagInput } from '../../src/foundation/types.js'
 import { DEFAULT_TAG_COLORS } from '../../src/foundation/lib/constants.js'
@@ -16,7 +16,7 @@ function mapTag(r: DbRow) {
   }
 }
 
-export default function tagRoutes(db: Database.Database) {
+export default function tagRoutes(db: Database) {
   const app = new Hono()
 
   app.get('/', (c) => {

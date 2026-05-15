@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { DATA_TYPE_BIT_LENGTH_MAP, SIGNAL_DATA_TYPES, DEFAULT_TAG_COLORS } from './constants'
 
 describe('Data Type Constants', () => {

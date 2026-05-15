@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type Database from 'better-sqlite3'
+import type { Database } from 'bun:sqlite'
 import { generateSignalId } from '../../src/foundation/lib/signal-id.js'
 import type { CreateSignalInput, UpdateSignalInput } from '../../src/foundation/types.js'
 
@@ -16,7 +16,7 @@ function mapSignal(r: DbRow) {
   }
 }
 
-export default function signalRoutes(db: Database.Database) {
+export default function signalRoutes(db: Database) {
   const app = new Hono()
 
   app.post('/messages/:messageId/signals', async (c) => {

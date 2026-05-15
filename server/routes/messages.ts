@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type Database from 'better-sqlite3'
+import type { Database } from 'bun:sqlite'
 import { randomUUID } from 'crypto'
 import { generateSignalId } from '../../src/foundation/lib/signal-id.js'
 import type { CreateMessageInput, UpdateMessageInput, Message, Signal, Tag } from '../../src/foundation/types.js'
@@ -18,7 +18,7 @@ function mapTag(r: DbRow): Tag {
   return { id: r.id as string, name: r.name as string, color: r.color as string, createdAt: r.created_at as string, updatedAt: r.updated_at as string }
 }
 
-function getSignalTags(db: Database.Database, signalId: string): Tag[] {
+function getSignalTags(db: Database, signalId: string): Tag[] {
   return (db.prepare(
     `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
      FROM tags t JOIN signal_tags st ON t.id = st.tag_id
@@ -26,7 +26,7 @@ function getSignalTags(db: Database.Database, signalId: string): Tag[] {
   ).all(signalId) as DbRow[]).map(mapTag)
 }
 
-function getMessageTags(db: Database.Database, messageId: string): Tag[] {
+function getMessageTags(db: Database, messageId: string): Tag[] {
   return (db.prepare(
     `SELECT t.id, t.name, t.color, t.created_at, t.updated_at
      FROM tags t JOIN message_tags mt ON t.id = mt.tag_id
@@ -45,7 +45,7 @@ function mapSignal(r: DbRow): Signal {
   }
 }
 
-export default function messageRoutes(db: Database.Database) {
+export default function messageRoutes(db: Database) {
   const app = new Hono()
 
   app.get('/', (c) => {

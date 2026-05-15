@@ -3,9 +3,9 @@
 ## Running Tests
 
 ```bash
-yarn test                                    # all tests
-yarn test --watch                            # watch mode
-yarn test src/foundation/lib/validate.test.ts  # specific file
+bun test                                    # all tests
+bun test --watch                            # watch mode
+bun test src/foundation/lib/validate.test.ts  # specific file
 ```
 
 ## What to Test

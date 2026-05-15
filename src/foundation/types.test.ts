@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import type { Tag, CreateTagInput, UpdateTagInput, SignalDataType } from '@/foundation/types'
 import { DEFAULT_TAG_COLORS } from '@/foundation/lib/constants'
 

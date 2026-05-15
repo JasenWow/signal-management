@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type Database from 'better-sqlite3'
+import type { Database } from 'bun:sqlite'
 import { randomUUID } from 'crypto'
 
 interface DbRow { [key: string]: unknown }
@@ -19,7 +19,7 @@ function mapTable(r: DbRow, entries: ReturnType<typeof mapEntry>[]) {
   }
 }
 
-export default function valueTableRoutes(db: Database.Database) {
+export default function valueTableRoutes(db: Database) {
   const app = new Hono()
 
   app.get('/', (c) => {

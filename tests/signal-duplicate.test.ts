@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach } from 'bun:test'
+import { Database } from 'bun:sqlite'
 import { SCHEMA_DDL } from '../server/db/schema.js'
 import messageRoutes from '../server/routes/messages.js'
 import signalRoutes from '../server/routes/signals.js'
 
 function createTestDb() {
   const db = new Database(':memory:')
-  db.pragma('foreign_keys = ON')
+  db.exec('PRAGMA foreign_keys = ON')
   db.exec(SCHEMA_DDL)
   db.exec(`ALTER TABLE signals ADD COLUMN data_type TEXT DEFAULT NULL;`)
   return db

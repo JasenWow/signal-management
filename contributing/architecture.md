@@ -20,7 +20,7 @@ L3 ──→ L2 ──→ L1 ──→ L0
               L1 ←──→ L1  (internal free)
 ```
 
-Enforced by `dependency-cruiser` — run `yarn dep-check`. CI will catch violations.
+Enforced by `dependency-cruiser` — run `bun dep-check`. CI will catch violations.
 
 ## Directory Layout
 

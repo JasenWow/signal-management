@@ -4,16 +4,16 @@
 
 ```bash
 # Start the dev server first
-yarn dev
+bun dev
 
 # Run all E2E tests
-E2E_USER_EMAIL=<email> E2E_USER_PASSWORD=<password> yarn test:e2e
+E2E_USER_EMAIL=<email> E2E_USER_PASSWORD=<password> bun test:e2e
 
 # Run a specific test
-E2E_USER_EMAIL=<email> E2E_USER_PASSWORD=<password> yarn test:e2e --grep "roles"
+E2E_USER_EMAIL=<email> E2E_USER_PASSWORD=<password> bun test:e2e --grep "roles"
 
 # Open the Playwright UI for debugging
-E2E_USER_EMAIL=<email> E2E_USER_PASSWORD=<password> yarn test:e2e:ui
+E2E_USER_EMAIL=<email> E2E_USER_PASSWORD=<password> bun test:e2e:ui
 ```
 
 ## Project Structure

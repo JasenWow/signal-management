@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3'
+import type { Database } from 'bun:sqlite'
 import { SCHEMA_DDL } from './schema.js'
 
 interface Migration {
@@ -17,7 +17,7 @@ const migrations: Migration[] = [
   },
 ]
 
-export function runMigrations(db: Database.Database): void {
+export function runMigrations(db: Database): void {
   db.exec(SCHEMA_DDL)
 
   const insert = db.prepare(
