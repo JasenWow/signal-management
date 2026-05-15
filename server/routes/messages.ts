@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
-import { eq, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { randomUUID } from 'crypto'
 import { generateSignalId } from '../../src/foundation/lib/signal-id.js'
 import type { CreateMessageInput, UpdateMessageInput } from '../../src/foundation/types.js'
 import * as schema from '../db/schema.js'
 
-const { messages, signals, tags, signalTags, messageTags } = schema
+const { messages, signals, signalGroups, tags, signalTags, messageTags } = schema
 
 function getSignalTags(db: BunSQLiteDatabase<typeof schema>, signalId: string) {
   return db.select({ id: tags.id, name: tags.name, color: tags.color, createdAt: tags.createdAt, updatedAt: tags.updatedAt })
@@ -38,7 +38,8 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
 
     const signalRows = db.select().from(signals).where(eq(signals.messageId, id)).orderBy(signals.startBit).all()
     const signalsWithTags = signalRows.map((s) => ({ ...s, tags: getSignalTags(db, s.id) }))
-    return c.json({ ...row, signals: signalsWithTags, tags: getMessageTags(db, id) })
+    const groupRows = db.select().from(signalGroups).where(eq(signalGroups.messageId, id)).orderBy(signalGroups.sortOrder).all()
+    return c.json({ ...row, signals: signalsWithTags, signalGroups: groupRows, tags: getMessageTags(db, id) })
   })
 
   app.post('/', async (c) => {
@@ -90,6 +91,11 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
         name: string; description?: string; startBit: number; bitLength: number;
         byteOrder?: string; factor?: number; offset?: number; unit?: string;
         minimum?: number | null; maximum?: number | null; color?: string; sortOrder?: number;
+        groupName?: string | null;
+      }>;
+      signalGroups?: Array<{
+        name: string; description?: string; startBit: number; bitWidth: number;
+        isRepeating?: boolean; color?: string; sortOrder?: number;
       }>;
     }>()
 
@@ -104,6 +110,25 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
 
     try {
       db.transaction((tx) => {
+        // Pass 1: Create signal groups first to resolve IDs
+        const groupIdMap = new Map<string, string>()
+        if (body.signalGroups?.length) {
+          for (let i = 0; i < body.signalGroups.length; i++) {
+            const g = body.signalGroups[i]
+            const groupId = randomUUID()
+            groupIdMap.set(g.name, groupId)
+            tx.insert(signalGroups).values({
+              id: groupId, messageId, name: g.name, description: g.description ?? '',
+              startBit: g.startBit, bitWidth: g.bitWidth,
+              isRepeating: g.isRepeating ?? false,
+              repeatCount: null,
+              color: g.color ?? '#8B5CF6', sortOrder: g.sortOrder ?? i,
+              createdAt: now, updatedAt: now,
+            }).run()
+          }
+        }
+
+        // Pass 2: Create signals with groupId already resolved
         const conflictingSignals: string[] = []
         for (let i = 0; i < body.signals.length; i++) {
           const s = body.signals[i]
@@ -113,6 +138,7 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
           } catch (err: any) {
             throw Object.assign(new Error(`Invalid signal "${s.name}": ${err.message}`), { status: 400 })
           }
+          const groupId = s.groupName ? groupIdMap.get(s.groupName) ?? null : null
           try {
             tx.insert(signals).values({
               id: signalId, messageId, name: s.name, description: s.description ?? '',
@@ -120,8 +146,8 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
               byteOrder: s.byteOrder ?? 'big', factor: s.factor ?? 1.0,
               offset: s.offset ?? 0.0, unit: s.unit ?? '',
               minimum: s.minimum ?? null, maximum: s.maximum ?? null,
-              valueTableId: null, color: s.color ?? '#10B981',
-              sortOrder: s.sortOrder ?? i, createdAt: now, updatedAt: now,
+              valueTableId: null, dataType: null, color: s.color ?? '#10B981',
+              groupId, sortOrder: s.sortOrder ?? i, createdAt: now, updatedAt: now,
             }).run()
           } catch (err: any) {
             if (err.message.includes('UNIQUE') || err.message.includes('SQLITE_CONSTRAINT')) {
@@ -149,7 +175,8 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
 
     const row = db.select().from(messages).where(eq(messages.id, messageId)).get()
     const signalRows = db.select().from(signals).where(eq(signals.messageId, messageId)).orderBy(signals.startBit).all()
-    return c.json({ ...row, signals: signalRows }, 201)
+    const groupRows = db.select().from(signalGroups).where(eq(signalGroups.messageId, messageId)).orderBy(signalGroups.sortOrder).all()
+    return c.json({ ...row, signals: signalRows, signalGroups: groupRows }, 201)
   })
 
   return app

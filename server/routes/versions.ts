@@ -6,7 +6,7 @@ import * as jsondiffpatch from 'jsondiffpatch'
 import type { VersionSnapshot } from '../../src/foundation/types.js'
 import * as schema from '../db/schema.js'
 
-const { messages, signals, valueTables, valueTableEntries, versions, tags, signalTags, messageTags } = schema
+const { messages, signals, signalGroups, valueTables, valueTableEntries, versions, tags, signalTags, messageTags } = schema
 
 function getSignalTags(db: BunSQLiteDatabase<typeof schema>, signalId: string) {
   return db.select({ id: tags.id, name: tags.name, color: tags.color, createdAt: tags.createdAt, updatedAt: tags.updatedAt })
@@ -23,6 +23,7 @@ function getMessageTags(db: BunSQLiteDatabase<typeof schema>, messageId: string)
 function buildSnapshot(db: BunSQLiteDatabase<typeof schema>, messageId: string): VersionSnapshot {
   const msgRow = db.select().from(messages).where(eq(messages.id, messageId)).get()!
   const signalRows = db.select().from(signals).where(eq(signals.messageId, messageId)).orderBy(signals.startBit).all()
+  const groupRows = db.select().from(signalGroups).where(eq(signalGroups.messageId, messageId)).orderBy(signalGroups.sortOrder).all()
 
   const valueTableIds = [...new Set(signalRows.map(s => s.valueTableId).filter(Boolean))] as string[]
   const vtList = valueTableIds.map(vtId => {
@@ -36,7 +37,7 @@ function buildSnapshot(db: BunSQLiteDatabase<typeof schema>, messageId: string):
   const mTags = getMessageTags(db, messageId)
   const sTags = signalRows.map(s => ({ signalId: s.id, tags: getSignalTags(db, s.id) }))
 
-  return { message: msgRow, signals: signalRows, valueTables: vtList, messageTags: mTags, signalTags: sTags }
+  return { message: msgRow, signals: signalRows, signalGroups: groupRows, valueTables: vtList, messageTags: mTags, signalTags: sTags }
 }
 
 export default function versionRoutes(db: BunSQLiteDatabase<typeof schema>) {
@@ -126,7 +127,20 @@ export default function versionRoutes(db: BunSQLiteDatabase<typeof schema>) {
       updatedAt: now,
     }).where(eq(messages.id, messageId)).run()
 
+    // Delete signals first (they reference groups), then groups
     db.delete(signals).where(eq(signals.messageId, messageId)).run()
+    db.delete(signalGroups).where(eq(signalGroups.messageId, messageId)).run()
+
+    // Restore groups first (signals reference them)
+    for (const g of snapshot.signalGroups ?? []) {
+      db.insert(signalGroups).values({
+        id: g.id, messageId, name: g.name, description: g.description,
+        startBit: g.startBit, bitWidth: g.bitWidth, isRepeating: g.isRepeating ?? false,
+        repeatCount: (g as any).repeatCount ?? null,
+        color: g.color, sortOrder: g.sortOrder,
+        createdAt: g.createdAt, updatedAt: now,
+      }).run()
+    }
 
     for (const s of snapshot.signals) {
       db.insert(signals).values({
@@ -134,8 +148,8 @@ export default function versionRoutes(db: BunSQLiteDatabase<typeof schema>) {
         startBit: s.startBit, bitLength: s.bitLength, byteOrder: s.byteOrder,
         factor: s.factor, offset: s.offset, unit: s.unit,
         minimum: s.minimum, maximum: s.maximum, valueTableId: s.valueTableId,
-        dataType: s.dataType ?? null, color: s.color, sortOrder: s.sortOrder,
-        createdAt: s.createdAt, updatedAt: now,
+        dataType: s.dataType ?? null, color: s.color, groupId: s.groupId ?? null,
+        sortOrder: s.sortOrder, createdAt: s.createdAt, updatedAt: now,
       }).run()
     }
 

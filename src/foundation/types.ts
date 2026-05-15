@@ -29,7 +29,23 @@ export interface Signal {
   valueTableId: string | null
   dataType: SignalDataType | null
   color: string
+  groupId: string | null
   tags?: Tag[]
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SignalGroup {
+  id: string
+  messageId: string
+  name: string
+  description: string
+  startBit: number
+  bitWidth: number
+  isRepeating: boolean
+  repeatCount: number | null
+  color: string
   sortOrder: number
   createdAt: string
   updatedAt: string
@@ -66,6 +82,7 @@ export interface Version {
 export interface VersionSnapshot {
   message: Message
   signals: Signal[]
+  signalGroups: SignalGroup[]
   valueTables: ValueTable[]
   messageTags: Tag[]
   signalTags: { signalId: string; tags: Tag[] }[]
@@ -107,6 +124,7 @@ export interface CreateSignalInput {
   valueTableId?: string | null
   dataType?: SignalDataType
   color?: string
+  groupId?: string | null
 }
 
 export interface UpdateSignalInput {
@@ -122,6 +140,27 @@ export interface UpdateSignalInput {
   maximum?: number | null
   valueTableId?: string | null
   dataType?: SignalDataType
+  color?: string
+  groupId?: string | null
+}
+
+export interface CreateSignalGroupInput {
+  name: string
+  description?: string
+  startBit: number
+  bitWidth: number
+  isRepeating?: boolean
+  repeatCount?: number | null
+  color?: string
+}
+
+export interface UpdateSignalGroupInput {
+  name?: string
+  description?: string
+  startBit?: number
+  bitWidth?: number
+  isRepeating?: boolean
+  repeatCount?: number | null
   color?: string
 }
 

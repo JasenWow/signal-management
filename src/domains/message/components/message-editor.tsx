@@ -35,9 +35,9 @@ export function MessageEditor() {
 
   function handleExport() {
     if (!activeMessage) return
-    const signals = useMessageStore.getState().activeSignals
+    const { activeSignals, activeGroups } = useMessageStore.getState()
     const exportData = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       message: {
         name: activeMessage.name,
@@ -45,20 +45,33 @@ export function MessageEditor() {
         frameSize: activeMessage.frameSize,
         byteOrder: activeMessage.byteOrder,
       },
-      signals: signals.map(s => ({
-        name: s.name,
-        description: s.description,
-        startBit: s.startBit,
-        bitLength: s.bitLength,
-        byteOrder: s.byteOrder,
-        factor: s.factor,
-        offset: s.offset,
-        unit: s.unit,
-        minimum: s.minimum,
-        maximum: s.maximum,
-        color: s.color,
-        sortOrder: s.sortOrder,
+      signalGroups: activeGroups.map(g => ({
+        name: g.name,
+        description: g.description,
+        startBit: g.startBit,
+        bitWidth: g.bitWidth,
+        isRepeating: g.isRepeating,
+        color: g.color,
+        sortOrder: g.sortOrder,
       })),
+      signals: activeSignals.map(s => {
+        const group = s.groupId ? activeGroups.find(g => g.id === s.groupId) : null
+        return {
+          name: s.name,
+          description: s.description,
+          startBit: s.startBit,
+          bitLength: s.bitLength,
+          byteOrder: s.byteOrder,
+          factor: s.factor,
+          offset: s.offset,
+          unit: s.unit,
+          minimum: s.minimum,
+          maximum: s.maximum,
+          color: s.color,
+          sortOrder: s.sortOrder,
+          groupName: group?.name ?? null,
+        }
+      }),
     }
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)

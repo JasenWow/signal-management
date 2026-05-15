@@ -35,12 +35,31 @@ export const signals = sqliteTable('signals', {
   valueTableId: text('value_table_id').references(() => valueTables.id, { onDelete: 'set null' }),
   dataType: text('data_type'),
   color: text('color').notNull().default('#10B981'),
+  groupId: text('group_id').references((): any => signalGroups.id, { onDelete: 'cascade' }),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: text('created_at').notNull().default("(datetime('now'))"),
   updatedAt: text('updated_at').notNull().default("(datetime('now'))"),
 }, (t) => [
   index('idx_signals_message').on(t.messageId),
   index('idx_signals_start_bit').on(t.messageId, t.startBit),
+  index('idx_signals_group').on(t.groupId),
+])
+
+export const signalGroups = sqliteTable('signal_groups', {
+  id: text('id').primaryKey(),
+  messageId: text('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  startBit: integer('start_bit').notNull(),
+  bitWidth: integer('bit_width').notNull(),
+  isRepeating: integer('is_repeating', { mode: 'boolean' }).notNull().default(false),
+  repeatCount: integer('repeat_count'),
+  color: text('color').notNull().default('#8B5CF6'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: text('created_at').notNull().default("(datetime('now'))"),
+  updatedAt: text('updated_at').notNull().default("(datetime('now'))"),
+}, (t) => [
+  index('idx_signal_groups_message').on(t.messageId),
 ])
 
 export const valueTableEntries = sqliteTable('value_table_entries', {

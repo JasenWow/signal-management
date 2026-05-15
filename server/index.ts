@@ -7,6 +7,7 @@ import { initDb } from './db/connection.js'
 import { runMigrations } from './db/migrations.js'
 import messageRoutes from './routes/messages.js'
 import signalRoutes from './routes/signals.js'
+import signalGroupRoutes from './routes/signal-groups.js'
 import valueTableRoutes from './routes/valueTables.js'
 import versionRoutes from './routes/versions.js'
 import tagRoutes from './routes/tags.js'
@@ -21,6 +22,7 @@ runMigrations(db, sqlite)
 
 app.route('/api/messages', messageRoutes(db))
 app.route('/api', signalRoutes(db))
+app.route('/api', signalGroupRoutes(db))
 app.route('/api/value-tables', valueTableRoutes(db))
 app.route('/api/versions', versionRoutes(db))
 app.route('/api/tags', tagRoutes(db))

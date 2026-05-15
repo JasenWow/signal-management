@@ -6,11 +6,11 @@ import { DEFAULT_CELL_SIZE } from '@/foundation/lib/constants'
 import { getBitLabel } from '@/foundation/lib/bit-position'
 
 interface BitCanvasProps {
-  onBitSelection: (startBit: number, bitLength: number) => void
+  onBitSelection: (startBit: number, bitLength: number, groupId?: string | null) => void
 }
 
 export function BitCanvas({ onBitSelection }: BitCanvasProps) {
-  const { activeMessage, activeSignals, selectedSignalId, bitNumbering, setBitNumbering } = useMessageStore()
+  const { activeMessage, activeSignals, activeGroups, selectedSignalId, bitNumbering, setBitNumbering } = useMessageStore()
   const message = activeMessage
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoveredBit, setHoveredBit] = useState<number | null>(null)
@@ -47,6 +47,11 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
     [width, height, cellSize, frameSize]
   )
 
+  // Find which group a bit belongs to
+  function getGroupAtBit(bitPos: number) {
+    return activeGroups.find((g) => bitPos >= g.startBit && bitPos < g.startBit + g.bitWidth)
+  }
+
   const selectedSignal = activeSignals.find((s) => s.id === selectedSignalId)
 
   function isBitInDrag(bitPos: number) {
@@ -62,7 +67,68 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
   }
 
   function getSignalAtBit(bitPos: number) {
-    return activeSignals.find((s) => bitPos >= s.startBit && bitPos < s.startBit + s.bitLength)
+    return activeSignals.find((s) => {
+      return bitPos >= s.startBit && bitPos < s.startBit + s.bitLength
+    })
+  }
+
+  // Render group boundary rectangles
+  function renderGroupBoundaries() {
+    return activeGroups.map((group) => {
+      const startRow = Math.floor(group.startBit / 8)
+      const startCol = group.startBit % 8
+      const endBit = group.startBit + group.bitWidth - 1
+      const endRow = Math.floor(endBit / 8)
+      const endCol = endBit % 8
+
+      // Compute bounding box
+      const x = startCol * cellSize
+      const y = startRow * cellSize
+      const w = (endCol + 1) * cellSize - startCol * cellSize
+      const h = (endRow - startRow + 1) * cellSize
+
+      return (
+        <g key={`group-${group.id}`}>
+          <rect
+            x={x}
+            y={y}
+            width={w}
+            height={h}
+            fill={group.color + '08'}
+            stroke={group.color}
+            strokeWidth={2}
+            strokeDasharray="6 3"
+            rx={4}
+          />
+          {group.repeatCount != null && group.repeatCount > 0 && (
+            <text
+              x={x + w - 4}
+              y={y + 14}
+              textAnchor="end"
+              fontSize={11}
+              fontFamily="monospace"
+              fill={group.color}
+              fontWeight="bold"
+              style={{ pointerEvents: 'none' }}
+            >
+              x{group.repeatCount}
+            </text>
+          )}
+          <text
+            x={x + 4}
+            y={y + 14}
+            textAnchor="start"
+            fontSize={10}
+            fontFamily="monospace"
+            fill={group.color}
+            fontWeight="600"
+            style={{ pointerEvents: 'none' }}
+          >
+            {group.name}
+          </text>
+        </g>
+      )
+    })
   }
 
   return (
@@ -149,6 +215,9 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
               const isHovered = bitPos === hoveredBit
 
               let fill = '#ffffff'
+              // Group background tint
+              const group = getGroupAtBit(bitPos)
+              if (group && !signal) fill = group.color + '08'
               if (signal) fill = signal.color + '25'
               if (inSelected) fill = (selectedSignal?.color ?? '#3B82F6') + '45'
               if (inDrag) fill = '#3B82F650'
@@ -168,6 +237,9 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
               )
             })
           )}
+
+          {/* Group boundaries */}
+          {renderGroupBoundaries()}
 
           <SignalOverlay
             signals={activeSignals}
@@ -192,11 +264,12 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
           {hoveredBit !== null && !dragPreview && (() => {
             const signal = getSignalAtBit(hoveredBit)
             if (signal && mousePos) {
+              const absStart = signal.startBit
               const tipX = mousePos.x + 12
               const tipY = mousePos.y - 8
               const lines = [
-                signal.name,
-                `B${Math.floor(signal.startBit / 8)}:${getBitLabel(signal.startBit % 8, bitNumbering)} — B${Math.floor((signal.startBit + signal.bitLength - 1) / 8)}:${getBitLabel((signal.startBit + signal.bitLength - 1) % 8, bitNumbering)} (${signal.bitLength}b)`,
+                signal.name + (signal.groupId ? ' (group)' : ''),
+                `B${Math.floor(absStart / 8)}:${getBitLabel(absStart % 8, bitNumbering)} — B${Math.floor((absStart + signal.bitLength - 1) / 8)}:${getBitLabel((absStart + signal.bitLength - 1) % 8, bitNumbering)} (${signal.bitLength}b)`,
                 signal.dataType ?? 'raw',
                 signal.unit ? `Unit: ${signal.unit}` : null,
                 signal.factor !== 1 || signal.offset !== 0 ? `Factor: ${signal.factor}, Offset: ${signal.offset}` : null,
@@ -265,8 +338,12 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
           : hoveredBit !== null
             ? (() => {
                 const signal = getSignalAtBit(hoveredBit)
+                const group = getGroupAtBit(hoveredBit)
                 if (signal) {
                   return `${signal.name} — ${signal.bitLength}b ${signal.dataType ?? 'raw'}${signal.unit ? ` · ${signal.unit}` : ''}`
+                }
+                if (group) {
+                  return `Group: ${group.name} (bit ${hoveredBit})`
                 }
                 return `Byte ${Math.floor(hoveredBit / 8)}, Bit ${getBitLabel(hoveredBit % 8, bitNumbering)} (abs: ${hoveredBit})`
               })()

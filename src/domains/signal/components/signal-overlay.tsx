@@ -78,9 +78,8 @@ export function SignalOverlay({ signals, cellSize, selectedSignalId }: SignalOve
       })}
 
       {signals.map((signal) => {
-        const firstBit = signal.startBit
-        const row = Math.floor(firstBit / 8)
-        const col = firstBit % 8
+        const row = Math.floor(signal.startBit / 8)
+        const col = signal.startBit % 8
         const textX = col * cellSize + cellSize / 2
         const textY = row * cellSize + 10
 
