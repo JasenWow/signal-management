@@ -1,0 +1,10 @@
+com/smartcharge/flink/model/RawMessage.class
+com/smartcharge/flink/function/ParseProcessFunction.class
+com/smartcharge/flink/model/MessageSpec.class
+com/smartcharge/flink/parser/SignalParser.class
+com/smartcharge/flink/model/ParsedMessage.class
+com/smartcharge/flink/function/ParseProcessFunction$1.class
+com/smartcharge/flink/model/MessageSpec$SignalGroupDef.class
+com/smartcharge/flink/model/SignalDef.class
+com/smartcharge/flink/model/MessageSpec$MessageInfo.class
+com/smartcharge/flink/SmartChargeJob.class
