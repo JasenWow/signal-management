@@ -14,17 +14,10 @@ export function SignalForm({ mode, onClose }: SignalFormProps) {
   const {
     createSignal, updateSignal,
     activeMessageId, selectedSignalId,
-    activeSignals, activeGroups, pendingSelection,
+    activeSignals, pendingSelection,
   } = useMessageStore()
 
   const editingSignal = mode === 'edit' ? activeSignals.find((s) => s.id === selectedSignalId) : null
-  const groupFromPending = pendingSelection?.groupId
-    ? activeGroups.find((g) => g.id === pendingSelection.groupId)
-    : null
-  const signalGroup = editingSignal?.groupId
-    ? activeGroups.find((g) => g.id === editingSignal.groupId)
-    : groupFromPending
-  const isInGroup = !!signalGroup
 
   const [name, setName] = useState(editingSignal?.name ?? '')
   const [startBit, setStartBit] = useState(
@@ -63,7 +56,6 @@ export function SignalForm({ mode, onClose }: SignalFormProps) {
       const signalData = {
         name: name.trim(), startBit, bitLength, byteOrder, factor, offset, unit, color,
         dataType: dataType ?? undefined,
-        groupId: signalGroup?.id ?? null,
       }
 
       if (editingSignal) {
@@ -97,12 +89,6 @@ export function SignalForm({ mode, onClose }: SignalFormProps) {
         <h3 className="text-base font-semibold border-b pb-2">
           {editingSignal ? `Edit: ${editingSignal.name}` : 'Define New Signal'}
         </h3>
-
-        {isInGroup && signalGroup && (
-          <div className="text-xs font-medium px-2.5 py-1.5 rounded" style={{ backgroundColor: signalGroup.color + '15', color: signalGroup.color }}>
-            In group: {signalGroup.name}
-          </div>
-        )}
 
         {error && (
           <div className="text-sm text-red-600 bg-red-50 rounded px-3 py-1.5">{error}</div>

@@ -1,15 +1,13 @@
 import { create } from 'zustand'
-import type { Message, Signal, SignalGroup, CreateMessageInput, CreateSignalInput, CreateSignalGroupInput, UpdateSignalGroupInput, BitNumbering } from '@/foundation/types'
+import type { Message, Signal, CreateMessageInput, CreateSignalInput, BitNumbering } from '@/foundation/types'
 
 interface MessageStore {
   messages: Message[]
   activeMessage: Message | null
   activeMessageId: string | null
   activeSignals: Signal[]
-  activeGroups: SignalGroup[]
   selectedSignalId: string | null
-  selectedGroupId: string | null
-  pendingSelection: { startBit: number; bitLength: number; groupId?: string | null } | null
+  pendingSelection: { startBit: number; bitLength: number } | null
   bitNumbering: BitNumbering
 
   loadMessages: () => Promise<void>
@@ -17,20 +15,15 @@ interface MessageStore {
   createMessage: (data: CreateMessageInput) => Promise<Message>
   updateMessage: (id: string, data: Partial<CreateMessageInput>) => Promise<void>
   deleteMessage: (id: string) => Promise<void>
-  importSpec: (data: { message: CreateMessageInput; signals: CreateSignalInput[]; signalGroups?: CreateSignalGroupInput[] }) => Promise<Message>
+  importSpec: (data: { message: CreateMessageInput; signals: CreateSignalInput[] }) => Promise<Message>
 
-  addSignal: (data: { startBit: number; bitLength: number; groupId?: string | null }) => void
+  addSignal: (data: { startBit: number; bitLength: number }) => void
   createSignal: (data: CreateSignalInput) => Promise<void>
   updateSignal: (id: string, data: Partial<CreateSignalInput>) => Promise<void>
   deleteSignal: (id: string) => Promise<void>
 
-  createGroup: (data: CreateSignalGroupInput) => Promise<void>
-  updateGroup: (id: string, data: UpdateSignalGroupInput) => Promise<void>
-  deleteGroup: (id: string) => Promise<void>
-
   setSelectedSignal: (id: string | null) => void
-  setSelectedGroup: (id: string | null) => void
-  setPendingSelection: (sel: { startBit: number; bitLength: number; groupId?: string | null } | null) => void
+  setPendingSelection: (sel: { startBit: number; bitLength: number } | null) => void
   setBitNumbering: (mode: BitNumbering) => void
 }
 
@@ -39,9 +32,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
   activeMessage: null,
   activeMessageId: null,
   activeSignals: [],
-  activeGroups: [],
   selectedSignalId: null,
-  selectedGroupId: null,
   pendingSelection: null,
   bitNumbering: 'msb0',
 
@@ -53,19 +44,17 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
 
   selectMessage: async (id: string) => {
     if (!id) {
-      set({ activeMessageId: null, activeMessage: null, activeSignals: [], activeGroups: [], selectedSignalId: null, selectedGroupId: null, pendingSelection: null })
+      set({ activeMessageId: null, activeMessage: null, activeSignals: [], selectedSignalId: null, pendingSelection: null })
       return
     }
     const res = await fetch(`/api/messages/${id}`)
     const data = await res.json()
-    const { signals, signalGroups, ...messageData } = data
+    const { signals, ...messageData } = data
     set({
       activeMessageId: id,
       activeMessage: messageData as Message,
       activeSignals: signals ?? [],
-      activeGroups: signalGroups ?? [],
       selectedSignalId: null,
-      selectedGroupId: null,
       pendingSelection: null,
     })
   },
@@ -95,7 +84,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
     if (get().activeMessageId === id) {
       const res = await fetch(`/api/messages/${id}`)
       const data = await res.json()
-      const { signals, signalGroups, ...messageData } = data
+      const { signals, ...messageData } = data
       set({ activeMessage: messageData as Message })
     }
   },
@@ -103,7 +92,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
   deleteMessage: async (id) => {
     await fetch(`/api/messages/${id}`, { method: 'DELETE' })
     if (get().activeMessageId === id) {
-      set({ activeMessageId: null, activeMessage: null, activeSignals: [], activeGroups: [] })
+      set({ activeMessageId: null, activeMessage: null, activeSignals: [] })
     }
     await get().loadMessages()
   },
@@ -122,7 +111,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
   },
 
   addSignal: (data) => {
-    set({ pendingSelection: data })
+    set({ pendingSelection: { startBit: data.startBit, bitLength: data.bitLength } })
   },
 
   createSignal: async (data) => {
@@ -172,53 +161,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
     }))
   },
 
-  createGroup: async (data) => {
-    const { activeMessageId } = get()
-    if (!activeMessageId) return
-    const res = await fetch(`/api/messages/${activeMessageId}/groups`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error((err as { error?: string }).error || 'Failed to create group')
-    }
-    const group = await res.json()
-    set((s) => ({ activeGroups: [...s.activeGroups, group] }))
-  },
-
-  updateGroup: async (id, data) => {
-    const res = await fetch(`/api/groups/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error((err as { error?: string }).error || 'Failed to update group')
-    }
-    const updated = await res.json()
-    set((s) => ({
-      activeGroups: s.activeGroups.map((g) => (g.id === id ? updated : g)),
-    }))
-  },
-
-  deleteGroup: async (id) => {
-    const res = await fetch(`/api/groups/${id}`, { method: 'DELETE' })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error((err as { error?: string }).error || 'Failed to delete group')
-    }
-    set((s) => ({
-      activeGroups: s.activeGroups.filter((g) => g.id !== id),
-      activeSignals: s.activeSignals.filter((sig) => sig.groupId !== id),
-      selectedGroupId: s.selectedGroupId === id ? null : s.selectedGroupId,
-    }))
-  },
-
   setSelectedSignal: (id) => set({ selectedSignalId: id }),
-  setSelectedGroup: (id) => set({ selectedGroupId: id }),
   setPendingSelection: (sel) => set({ pendingSelection: sel }),
   setBitNumbering: (mode) => set({ bitNumbering: mode }),
 }))

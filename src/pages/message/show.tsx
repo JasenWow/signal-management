@@ -4,7 +4,6 @@ import { useMessageStore } from '@/domains/message/hooks/use-message-store'
 import { useVersionStore } from '@/domains/version/hooks/use-version-store'
 import { SignalList } from '@/domains/signal/components/signal-list'
 import { SignalForm } from '@/domains/signal/components/signal-form'
-import { GroupForm } from '@/domains/signal/components/group-form'
 import { BitCanvas } from '@/domains/signal/components/bit-canvas'
 import { VersionPanel } from '@/domains/version/components/version-panel'
 import { TagFilter } from '@/domains/tag/components/tag-filter'
@@ -13,11 +12,10 @@ import { PreviewBanner } from '@/domains/version/components/preview-banner'
 export function MessageShowPage() {
   const { messageId } = useParams<{ messageId: string }>()
   const history = useHistory()
-  const { activeMessageId, activeMessage, activeGroups, loadMessages, selectMessage, addSignal } = useMessageStore()
+  const { activeMessageId, activeMessage, loadMessages, selectMessage, addSignal } = useMessageStore()
   const { versions, previewSnapshot, previewVersionId, isLoadingSnapshot, clearPreview, loadVersions } = useVersionStore()
   const isPreviewMode = previewSnapshot !== null
   const [signalFormMode, setSignalFormMode] = useState<'closed' | 'create' | 'edit'>('closed')
-  const [groupFormMode, setGroupFormMode] = useState<'closed' | 'create' | 'edit'>('closed')
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
 
   useEffect(() => {
@@ -50,8 +48,7 @@ export function MessageShowPage() {
     if (isPreviewMode && previewSnapshot) {
       useMessageStore.setState({
         activeMessage: previewSnapshot.message,
-        activeSignals: previewSnapshot.signals,
-        activeGroups: previewSnapshot.signalGroups
+        activeSignals: previewSnapshot.signals
       })
     }
   }, [isPreviewMode, previewSnapshot])
@@ -62,17 +59,8 @@ export function MessageShowPage() {
     }
   }, [isPreviewMode, activeMessageId])
 
-  function handleBitSelection(startBit: number, bitLength: number, groupId?: string | null) {
-    // Determine if clicked bit is inside a group
-    const group = groupId
-      ? activeGroups.find((g) => g.id === groupId)
-      : activeGroups.find((g) => startBit >= g.startBit && startBit < g.startBit + g.bitWidth)
-
-    if (group) {
-      addSignal({ startBit, bitLength, groupId: group.id })
-    } else {
-      addSignal({ startBit, bitLength })
-    }
+  function handleBitSelection(startBit: number, bitLength: number) {
+    addSignal({ startBit, bitLength })
     setSignalFormMode('create')
   }
 
@@ -80,18 +68,9 @@ export function MessageShowPage() {
     setSignalFormMode('edit')
   }
 
-  function handleEditGroup() {
-    setGroupFormMode('edit')
-  }
-
   function handleFormClose() {
     setSignalFormMode('closed')
     useMessageStore.getState().setPendingSelection(null)
-  }
-
-  function handleGroupFormClose() {
-    setGroupFormMode('closed')
-    useMessageStore.getState().setSelectedGroup(null)
   }
 
   return (
@@ -100,27 +79,15 @@ export function MessageShowPage() {
         <div className="p-2 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Signals</h2>
           {activeMessageId && !isPreviewMode && (
-            <div className="flex gap-1">
-              <button
-                className="text-xs px-2 py-0.5 bg-violet-500 text-white rounded hover:bg-violet-600"
-                onClick={() => {
-                  useMessageStore.getState().setSelectedGroup(null)
-                  setGroupFormMode('create')
-                }}
-                title="Add repeating group"
-              >
-                + Group
-              </button>
-              <button
-                className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded hover:bg-blue-600"
-                onClick={() => {
-                  addSignal({ startBit: 0, bitLength: 1 })
-                  setSignalFormMode('create')
-                }}
-              >
-                + Add
-              </button>
-            </div>
+            <button
+              className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded hover:bg-blue-600"
+              onClick={() => {
+                addSignal({ startBit: 0, bitLength: 1 })
+                setSignalFormMode('create')
+              }}
+            >
+              + Add
+            </button>
           )}
         </div>
         {activeMessageId && (
@@ -133,7 +100,7 @@ export function MessageShowPage() {
           </div>
         )}
         <div className="flex-1 overflow-y-auto">
-          <SignalList onEdit={handleEditSignal} onEditGroup={handleEditGroup} filterTagIds={filterTagIds} readOnly={isPreviewMode} />
+          <SignalList onEdit={handleEditSignal} filterTagIds={filterTagIds} readOnly={isPreviewMode} />
         </div>
       </aside>
 
@@ -167,13 +134,6 @@ export function MessageShowPage() {
         <SignalForm
           mode={signalFormMode}
           onClose={handleFormClose}
-        />
-      )}
-
-      {groupFormMode !== 'closed' && activeMessage && (
-        <GroupForm
-          mode={groupFormMode}
-          onClose={handleGroupFormClose}
         />
       )}
     </div>
