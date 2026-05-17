@@ -78,7 +78,9 @@ const MIGRATIONS: { name: string; up: string }[] = [
     name: '002_tags_and_data_type',
     up: `ALTER TABLE signals ADD COLUMN data_type TEXT DEFAULT NULL;`,
   },
-  export function runMigrations(db: BunSQLiteDatabase<typeof schema>, sqlite?: Database) {
+]
+
+export function runMigrations(db: BunSQLiteDatabase<typeof schema>, sqlite?: Database) {
   const raw = sqlite ?? (db as any).session?.client ?? (db as any).driver
   if (raw && typeof raw.exec === 'function') {
     raw.exec(SCHEMA_DDL)

@@ -41,7 +41,6 @@ describe('VersionStore - Preview State', () => {
       const mockSnapshot: VersionSnapshot = {
         message: { id: 'msg-1', name: 'Test', frameSize: 8, createdAt: '', updatedAt: '' },
         signals: [],
-        signalGroups: [],
         valueTables: [],
         messageTags: [],
         signalTags: [],
@@ -72,7 +71,6 @@ describe('VersionStore - Preview State', () => {
       const mockSnapshot: VersionSnapshot = {
         message: { id: 'msg-1', name: 'Test', frameSize: 8, createdAt: '', updatedAt: '' },
         signals: [],
-        signalGroups: [],
         valueTables: [],
         messageTags: [],
         signalTags: [],
@@ -108,7 +106,6 @@ describe('VersionStore - Preview State', () => {
       const mockSnapshot: VersionSnapshot = {
         message: { id: 'msg-1', name: 'Test', frameSize: 8, createdAt: '', updatedAt: '' },
         signals: [],
-        signalGroups: [],
         valueTables: [],
         messageTags: [],
         signalTags: [],

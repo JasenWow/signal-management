@@ -7,8 +7,8 @@ vi.mock('@/domains/message/hooks/use-message-store', () => ({
 }))
 
 const mockSignals = [
-  { id: 'sig-1', name: 'Signal1', startBit: 0, bitLength: 8, color: '#ff0000', tags: [], groupId: null },
-  { id: 'sig-2', name: 'Signal2', startBit: 8, bitLength: 8, color: '#00ff00', tags: [], groupId: null },
+  { id: 'sig-1', name: 'Signal1', startBit: 0, bitLength: 8, color: '#ff0000', tags: [] },
+  { id: 'sig-2', name: 'Signal2', startBit: 8, bitLength: 8, color: '#00ff00', tags: [] },
 ]
 
 const mockStore = {
