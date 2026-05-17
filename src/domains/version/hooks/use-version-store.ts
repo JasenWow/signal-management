@@ -1,11 +1,14 @@
 import { create } from 'zustand'
-import type { VersionSummary } from '@/foundation/types'
+import type { VersionSnapshot, VersionSummary } from '@/foundation/types'
 
 interface VersionStore {
   versions: VersionSummary[]
   selectedVersionId: string | null
   comparisonIds: [string | null, string | null]
   activeDiff: unknown | null
+  previewSnapshot: VersionSnapshot | null
+  previewVersionId: string | null
+  isLoadingSnapshot: boolean
 
   loadVersions: (messageId: string) => Promise<void>
   commit: (messageId: string, message: string) => Promise<void>
@@ -13,6 +16,8 @@ interface VersionStore {
   loadDiff: (idA: string, idB: string) => Promise<void>
   setSelectedVersion: (id: string | null) => void
   setComparisonIds: (ids: [string | null, string | null]) => void
+  loadVersionSnapshot: (id: string) => Promise<void>
+  clearPreview: () => void
 }
 
 export const useVersionStore = create<VersionStore>((set, get) => ({
@@ -20,6 +25,9 @@ export const useVersionStore = create<VersionStore>((set, get) => ({
   selectedVersionId: null,
   comparisonIds: [null, null],
   activeDiff: null,
+  previewSnapshot: null,
+  previewVersionId: null,
+  isLoadingSnapshot: false,
 
   loadVersions: async (messageId) => {
     const res = await fetch(`/api/versions?messageId=${messageId}`)
@@ -53,4 +61,20 @@ export const useVersionStore = create<VersionStore>((set, get) => ({
 
   setSelectedVersion: (id) => set({ selectedVersionId: id }),
   setComparisonIds: (ids) => set({ comparisonIds: ids }),
+
+  loadVersionSnapshot: async (id) => {
+    set({ isLoadingSnapshot: true })
+    try {
+      const res = await fetch(`/api/versions/${id}`)
+      const data = await res.json()
+      set({ previewSnapshot: data.snapshot, previewVersionId: id, isLoadingSnapshot: false })
+    } catch (e) {
+      set({ isLoadingSnapshot: false })
+      throw e
+    }
+  },
+
+  clearPreview: () => set({ previewSnapshot: null, previewVersionId: null }),
 }))
+
+export const isPreviewMode = (state: VersionStore) => state.previewSnapshot !== null
