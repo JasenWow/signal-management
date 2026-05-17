@@ -50,6 +50,7 @@ public class MessageSpec {
         private int bitWidth;
         private boolean isRepeating;
         private Integer repeatCount;
+        private List<SignalDef> signals;
 
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
@@ -62,5 +63,8 @@ public class MessageSpec {
 
         public Integer getRepeatCount() { return repeatCount; }
         public void setRepeatCount(Integer repeatCount) { this.repeatCount = repeatCount; }
+
+        public List<SignalDef> getSignals() { return signals; }
+        public void setSignals(List<SignalDef> signals) { this.signals = signals; }
     }
 }

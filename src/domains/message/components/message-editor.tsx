@@ -37,7 +37,7 @@ export function MessageEditor() {
     if (!activeMessage) return
     const { activeSignals, activeGroups } = useMessageStore.getState()
     const exportData = {
-      version: 2,
+      version: 3,
       exportedAt: new Date().toISOString(),
       message: {
         name: activeMessage.name,
@@ -45,19 +45,35 @@ export function MessageEditor() {
         frameSize: activeMessage.frameSize,
         byteOrder: activeMessage.byteOrder,
       },
-      signalGroups: activeGroups.map(g => ({
-        name: g.name,
-        description: g.description,
-        startBit: g.startBit,
-        bitWidth: g.bitWidth,
-        isRepeating: g.isRepeating,
-        repeatCount: g.repeatCount,
-        color: g.color,
-        sortOrder: g.sortOrder,
-      })),
-      signals: activeSignals.map(s => {
-        const group = s.groupId ? activeGroups.find(g => g.id === s.groupId) : null
+      signalGroups: activeGroups.map(g => {
+        const groupSignals = activeSignals.filter(s => s.groupId === g.id)
         return {
+          name: g.name,
+          description: g.description,
+          startBit: g.startBit,
+          bitWidth: g.bitWidth,
+          isRepeating: g.isRepeating,
+          repeatCount: g.repeatCount,
+          signals: groupSignals.map(s => ({
+            name: s.name,
+            description: s.description,
+            startBit: s.startBit - g.startBit,
+            bitLength: s.bitLength,
+            byteOrder: s.byteOrder,
+            factor: s.factor,
+            offset: s.offset,
+            unit: s.unit,
+            minimum: s.minimum,
+            maximum: s.maximum,
+            dataType: s.dataType ?? null,
+            color: s.color,
+            sortOrder: s.sortOrder,
+          })),
+        }
+      }),
+      signals: activeSignals
+        .filter(s => !s.groupId)
+        .map(s => ({
           name: s.name,
           description: s.description,
           startBit: s.startBit,
@@ -68,11 +84,10 @@ export function MessageEditor() {
           unit: s.unit,
           minimum: s.minimum,
           maximum: s.maximum,
+          dataType: s.dataType ?? null,
           color: s.color,
           sortOrder: s.sortOrder,
-          groupName: group?.name ?? null,
-        }
-      }),
+        })),
     }
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)

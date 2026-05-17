@@ -28,49 +28,55 @@ public class SignalParser {
     private final String messageName;
     private final int frameSize;
     private final List<SignalDef> signals;
-    private final Map<String, MessageSpec.SignalGroupDef> signalGroupsByName;
 
     public SignalParser(MessageSpec spec) {
         this.messageName = spec.getMessage().getName();
         this.frameSize = spec.getMessage().getFrameSize();
-        this.signalGroupsByName = buildGroupMap(spec.getSignalGroups());
         this.signals = buildExpandedSignalList(spec.getSignals(), spec.getSignalGroups());
     }
 
-    private Map<String, MessageSpec.SignalGroupDef> buildGroupMap(List<MessageSpec.SignalGroupDef> groups) {
-        Map<String, MessageSpec.SignalGroupDef> map = new HashMap<>();
-        if (groups != null) {
-            for (MessageSpec.SignalGroupDef group : groups) {
-                if (group.getName() != null) {
-                    map.put(group.getName(), group);
+    private List<SignalDef> buildExpandedSignalList(List<SignalDef> flatSignals, List<MessageSpec.SignalGroupDef> groups) {
+        List<SignalDef> expanded = new ArrayList<>();
+
+        // 1. Add non-grouped signals (from top-level, absolute startBit, no modification)
+        if (flatSignals != null) {
+            for (SignalDef signal : flatSignals) {
+                if (signal.getGroupName() == null) {
+                    expanded.add(signal);
                 }
             }
         }
-        return map;
-    }
 
-    private List<SignalDef> buildExpandedSignalList(List<SignalDef> signals, List<MessageSpec.SignalGroupDef> groups) {
-        List<SignalDef> expanded = new ArrayList<>();
-        for (SignalDef signal : signals) {
-            String groupName = signal.getGroupName();
-            if (groupName != null) {
-                MessageSpec.SignalGroupDef group = signalGroupsByName.get(groupName);
-                if (group != null && group.getRepeatCount() != null && group.getRepeatCount() >= 2) {
+        // 2. Process signal groups (signals inside groups use relative startBit)
+        if (groups != null) {
+            for (MessageSpec.SignalGroupDef group : groups) {
+                List<SignalDef> groupSignals = group.getSignals();
+                if (groupSignals == null || groupSignals.isEmpty()) continue;
+
+                if (group.getRepeatCount() != null && group.getRepeatCount() >= 2) {
+                    // Repeating group: expand with suffixes and offset calculation
                     int repeatCount = group.getRepeatCount();
                     int bitWidth = group.getBitWidth();
                     for (int i = 1; i <= repeatCount; i++) {
-                        SignalDef copy = copySignal(signal);
-                        copy.setName(signal.getName() + "_" + i);
-                        copy.setStartBit(signal.getStartBit() + (i - 1) * bitWidth);
-                        expanded.add(copy);
+                        for (SignalDef signal : groupSignals) {
+                            SignalDef copy = copySignal(signal);
+                            copy.setName(signal.getName() + "_" + i);
+                            // Absolute startBit = group.startBit + signal.relativeStartBit + (i-1) * group.bitWidth
+                            copy.setStartBit(group.getStartBit() + signal.getStartBit() + (i - 1) * bitWidth);
+                            expanded.add(copy);
+                        }
                     }
                 } else {
-                    expanded.add(signal);
+                    // Non-repeating group: convert relative → absolute startBit
+                    for (SignalDef signal : groupSignals) {
+                        SignalDef copy = copySignal(signal);
+                        copy.setStartBit(group.getStartBit() + signal.getStartBit());
+                        expanded.add(copy);
+                    }
                 }
-            } else {
-                expanded.add(signal);
             }
         }
+
         return expanded;
     }
 

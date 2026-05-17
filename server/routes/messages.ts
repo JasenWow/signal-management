@@ -91,12 +91,16 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
         name: string; description?: string; startBit: number; bitLength: number;
         byteOrder?: string; factor?: number; offset?: number; unit?: string;
         minimum?: number | null; maximum?: number | null; color?: string; sortOrder?: number;
-        groupName?: string | null;
       }>;
       signalGroups?: Array<{
         name: string; description?: string; startBit: number; bitWidth: number;
         isRepeating?: boolean; color?: string; sortOrder?: number;
         repeatCount?: number | null;
+        signals?: Array<{
+          name: string; description?: string; startBit: number; bitLength: number;
+          byteOrder?: string; factor?: number; offset?: number; unit?: string;
+          minimum?: number | null; maximum?: number | null; color?: string; sortOrder?: number;
+        }>;
       }>;
     }>()
 
@@ -111,13 +115,11 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
 
     try {
       db.transaction((tx) => {
-        // Pass 1: Create signal groups first to resolve IDs
-        const groupIdMap = new Map<string, string>()
+        // Pass 1: Create signal groups with their nested signals
         if (body.signalGroups?.length) {
           for (let i = 0; i < body.signalGroups.length; i++) {
             const g = body.signalGroups[i]
             const groupId = randomUUID()
-            groupIdMap.set(g.name, groupId)
             tx.insert(signalGroups).values({
               id: groupId, messageId, name: g.name, description: g.description ?? '',
               startBit: g.startBit, bitWidth: g.bitWidth,
@@ -126,10 +128,33 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
               color: g.color ?? '#8B5CF6', sortOrder: g.sortOrder ?? i,
               createdAt: now, updatedAt: now,
             }).run()
+
+            // Create signals nested inside this group with relative startBit
+            if (g.signals?.length) {
+              for (let j = 0; j < g.signals.length; j++) {
+                const s = g.signals[j]
+                const absoluteStartBit = g.startBit + s.startBit
+                let signalId: string
+                try {
+                  signalId = generateSignalId(messageId, s.name, absoluteStartBit, s.bitLength)
+                } catch (err: any) {
+                  throw Object.assign(new Error(`Invalid signal "${s.name}": ${err.message}`), { status: 400 })
+                }
+                tx.insert(signals).values({
+                  id: signalId, messageId, name: s.name, description: s.description ?? '',
+                  startBit: absoluteStartBit, bitLength: s.bitLength,
+                  byteOrder: s.byteOrder ?? 'big', factor: s.factor ?? 1.0,
+                  offset: s.offset ?? 0.0, unit: s.unit ?? '',
+                  minimum: s.minimum ?? null, maximum: s.maximum ?? null,
+                  valueTableId: null, dataType: null, color: s.color ?? '#10B981',
+                  groupId, sortOrder: s.sortOrder ?? j, createdAt: now, updatedAt: now,
+                }).run()
+              }
+            }
           }
         }
 
-        // Pass 2: Create signals with groupId already resolved
+        // Pass 2: Create top-level non-grouped signals
         const conflictingSignals: string[] = []
         for (let i = 0; i < body.signals.length; i++) {
           const s = body.signals[i]
@@ -139,7 +164,6 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
           } catch (err: any) {
             throw Object.assign(new Error(`Invalid signal "${s.name}": ${err.message}`), { status: 400 })
           }
-          const groupId = s.groupName ? groupIdMap.get(s.groupName) ?? null : null
           try {
             tx.insert(signals).values({
               id: signalId, messageId, name: s.name, description: s.description ?? '',
@@ -148,7 +172,7 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
               offset: s.offset ?? 0.0, unit: s.unit ?? '',
               minimum: s.minimum ?? null, maximum: s.maximum ?? null,
               valueTableId: null, dataType: null, color: s.color ?? '#10B981',
-              groupId, sortOrder: s.sortOrder ?? i, createdAt: now, updatedAt: now,
+              groupId: null, sortOrder: s.sortOrder ?? i, createdAt: now, updatedAt: now,
             }).run()
           } catch (err: any) {
             if (err.message.includes('UNIQUE') || err.message.includes('SQLITE_CONSTRAINT')) {
