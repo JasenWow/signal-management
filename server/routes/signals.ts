@@ -38,6 +38,41 @@ export default function signalRoutes(db: BunSQLiteDatabase<typeof schema>) {
       }
     }
 
+    // Check signal-vs-group-repeat-cycle conflicts
+    const signalRangeEnd = body.startBit + body.bitLength
+    const candidateGroups = db.select({
+      id: signalGroups.id,
+      name: signalGroups.name,
+      startBit: signalGroups.startBit,
+      bitWidth: signalGroups.bitWidth,
+      repeatCount: signalGroups.repeatCount,
+    })
+      .from(signalGroups)
+      .where(
+        and(
+          eq(signalGroups.messageId, messageId),
+          lt(signalGroups.startBit, signalRangeEnd + signalGroups.bitWidth),
+          gt(sql`${signalGroups.startBit} + ${signalGroups.bitWidth} * coalesce(${signalGroups.repeatCount}, 1)`, body.startBit),
+        )
+      ).all()
+
+    const newSignalRange = { start: body.startBit, end: signalRangeEnd }
+    const groupConflicts = candidateGroups.filter(candidate => {
+      const candRepeatCount = candidate.repeatCount ?? 1
+      const candRange = {
+        start: candidate.startBit,
+        end: candidate.startBit + candidate.bitWidth * candRepeatCount,
+      }
+      return newSignalRange.start < candRange.end && candRange.start < newSignalRange.end
+    })
+
+    if (groupConflicts.length > 0) {
+      return c.json({
+        error: 'Signal overlaps with existing group repeat cycles',
+        conflictingGroups: groupConflicts.map(g => ({ id: g.id, name: g.name })),
+      }, 409)
+    }
+
     try {
       db.insert(signals).values({
         id, messageId, name: body.name, description: body.description ?? '',
