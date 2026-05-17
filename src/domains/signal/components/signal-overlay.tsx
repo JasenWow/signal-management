@@ -1,7 +1,8 @@
-import type { Signal } from '@/foundation/types'
+import type { Signal, SignalGroup } from '@/foundation/types'
 
 interface SignalOverlayProps {
   signals: Signal[]
+  groups: SignalGroup[]
   cellSize: number
   selectedSignalId: string | null
 }
@@ -15,7 +16,7 @@ const SIGNAL_PATTERNS = [
   'url(#dots-1)',
 ]
 
-export function SignalOverlay({ signals, cellSize, selectedSignalId }: SignalOverlayProps) {
+export function SignalOverlay({ signals, groups, cellSize, selectedSignalId }: SignalOverlayProps) {
   return (
     <g className="pointer-events-none">
       <defs>
@@ -38,9 +39,23 @@ export function SignalOverlay({ signals, cellSize, selectedSignalId }: SignalOve
       </defs>
 
       {signals.map((signal, signalIdx) => {
-        const cells: { row: number; col: number }[] = []
-        for (let bit = signal.startBit; bit < signal.startBit + signal.bitLength; bit++) {
-          cells.push({ row: Math.floor(bit / 8), col: bit % 8 })
+        const cells: { row: number; col: number; cycle: number }[] = []
+
+        let cycleCount = 1
+        let cycleStride = 0
+        if (signal.groupId) {
+          const group = groups.find(g => g.id === signal.groupId)
+          if (group && group.repeatCount && group.repeatCount > 1) {
+            cycleCount = group.repeatCount
+            cycleStride = group.bitWidth
+          }
+        }
+
+        for (let cycle = 0; cycle < cycleCount; cycle++) {
+          const offset = cycle * cycleStride
+          for (let bit = signal.startBit + offset; bit < signal.startBit + signal.bitLength + offset; bit++) {
+            cells.push({ row: Math.floor(bit / 8), col: bit % 8, cycle })
+          }
         }
 
         const isSelected = signal.id === selectedSignalId
@@ -50,7 +65,7 @@ export function SignalOverlay({ signals, cellSize, selectedSignalId }: SignalOve
           <g key={signal.id}>
             {cells.map((cell) => (
               <rect
-                key={`fill-${cell.row}-${cell.col}`}
+                key={`fill-${cell.cycle}-${cell.row}-${cell.col}`}
                 x={cell.col * cellSize + 1}
                 y={cell.row * cellSize + 1}
                 width={cellSize - 2}
@@ -63,7 +78,7 @@ export function SignalOverlay({ signals, cellSize, selectedSignalId }: SignalOve
             ))}
             {patternUrl !== 'none' && cells.map((cell) => (
               <rect
-                key={`pattern-${cell.row}-${cell.col}`}
+                key={`pattern-${cell.cycle}-${cell.row}-${cell.col}`}
                 x={cell.col * cellSize + 1}
                 y={cell.row * cellSize + 1}
                 width={cellSize - 2}
@@ -78,18 +93,36 @@ export function SignalOverlay({ signals, cellSize, selectedSignalId }: SignalOve
       })}
 
       {signals.map((signal) => {
-        const row = Math.floor(signal.startBit / 8)
-        const col = signal.startBit % 8
-        const textX = col * cellSize + cellSize / 2
-        const textY = row * cellSize + 10
-
         if (signal.bitLength < 4) return null
 
-        return (
+        let cycleCount = 1
+        let cycleStride = 0
+        if (signal.groupId) {
+          const group = groups.find(g => g.id === signal.groupId)
+          if (group && group.repeatCount && group.repeatCount > 1) {
+            cycleCount = group.repeatCount
+            cycleStride = group.bitWidth
+          }
+        }
+
+        const labels: { x: number; y: number; cycle: number }[] = []
+        for (let cycle = 0; cycle < cycleCount; cycle++) {
+          const offset = cycle * cycleStride
+          const startBit = signal.startBit + offset
+          const row = Math.floor(startBit / 8)
+          const col = startBit % 8
+          labels.push({
+            x: col * cellSize + cellSize / 2,
+            y: row * cellSize + 10,
+            cycle,
+          })
+        }
+
+        return labels.map((label) => (
           <text
-            key={`label-${signal.id}`}
-            x={textX}
-            y={textY}
+            key={`label-${signal.id}-cycle-${label.cycle}`}
+            x={label.x}
+            y={label.y}
             textAnchor="middle"
             dominantBaseline="hanging"
             className="text-[11px] font-semibold pointer-events-none"
@@ -97,7 +130,7 @@ export function SignalOverlay({ signals, cellSize, selectedSignalId }: SignalOve
           >
             {signal.name.length > 12 ? signal.name.slice(0, 11) + '…' : signal.name}
           </text>
-        )
+        ))
       })}
     </g>
   )

@@ -254,6 +254,7 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
 
           <SignalOverlay
             signals={activeSignals}
+            groups={activeGroups}
             cellSize={cellSize}
             selectedSignalId={selectedSignalId}
           />
