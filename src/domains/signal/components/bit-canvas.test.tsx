@@ -19,9 +19,7 @@ const mockStore = {
   activeMessage: mockMessage,
   activeMessageId: 'msg-1',
   activeSignals: [],
-  activeGroups: [],
   selectedSignalId: null,
-  selectedGroupId: null,
   bitNumbering: 'msb0' as const,
   setBitNumbering: vi.fn(),
 }
