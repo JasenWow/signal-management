@@ -1,0 +1,46 @@
+{
+  "active_plan": "/Volumes/data/documents/codes/signal-management/.sisyphus/plans/history-readonly-view.md",
+  "started_at": "2026-05-17T12:49:01.949Z",
+  "session_ids": [
+    "ses_1ca0d2cd4ffeNjUQzidLmbp9Rp"
+  ],
+  "session_origins": {
+    "ses_1ca0d2cd4ffeNjUQzidLmbp9Rp": "direct"
+  },
+  "plan_name": "history-readonly-view",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Version Store Preview State (TDD)",
+      "session_id": "ses_1ca03081bffe7Cx03V92q9HyRG",
+      "agent": "Sisyphus-Junior",
+      "updated_at": "2026-05-17T13:09:57.249Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "BitCanvas Read-Only Mode (TDD)",
+      "session_id": "ses_1c9efc2abffe3KdqkkX1ZNmzUl",
+      "agent": "build",
+      "updated_at": "2026-05-17T13:19:32.090Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "Wire show.tsx + Integration + Escape Key (TDD)",
+      "session_id": "ses_1c9e56498ffed3FutqHBxz35EI",
+      "agent": "build",
+      "updated_at": "2026-05-17T13:24:27.546Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "**Plan Compliance Audit** — `oracle`",
+      "session_id": "ses_1c9e2450effexw2K4L1X3Zja0b",
+      "agent": "oracle",
+      "updated_at": "2026-05-17T13:29:53.524Z"
+    }
+  }
+}
