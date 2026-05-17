@@ -51,6 +51,7 @@ export function MessageEditor() {
         startBit: g.startBit,
         bitWidth: g.bitWidth,
         isRepeating: g.isRepeating,
+        repeatCount: g.repeatCount,
         color: g.color,
         sortOrder: g.sortOrder,
       })),
