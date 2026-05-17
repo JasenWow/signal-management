@@ -146,7 +146,7 @@ export function SignalList({ onEdit, onEditGroup, filterTagIds = [] }: SignalLis
               <div className="flex-1 min-w-0">
                 <span className="font-semibold">{group.name}</span>
                 <span className="text-gray-400 ml-1">
-                  {group.repeatCount ? `x${group.repeatCount} · ` : ''}{group.bitWidth}b
+                  {group.repeatCount != null ? `x${group.repeatCount} · ` : ''}{group.bitWidth}b
                 </span>
               </div>
               {onEditGroup && (

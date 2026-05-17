@@ -75,35 +75,46 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
   // Render group boundary rectangles
   function renderGroupBoundaries() {
     return activeGroups.map((group) => {
-      const startRow = Math.floor(group.startBit / 8)
-      const startCol = group.startBit % 8
-      const endBit = group.startBit + group.bitWidth - 1
-      const endRow = Math.floor(endBit / 8)
-      const endCol = endBit % 8
+      const repeatCount = group.repeatCount ?? 1
+      const rectangles: Array<{ x: number; y: number; w: number; h: number }> = []
 
-      // Compute bounding box
-      const x = startCol * cellSize
-      const y = startRow * cellSize
-      const w = (endCol + 1) * cellSize - startCol * cellSize
-      const h = (endRow - startRow + 1) * cellSize
+      for (let i = 0; i < repeatCount; i++) {
+        const cycleStartBit = group.startBit + i * group.bitWidth
+        if (cycleStartBit >= frameSize * 8) break
+        const startRow = Math.floor(cycleStartBit / 8)
+        const startCol = cycleStartBit % 8
+        const endBit = cycleStartBit + group.bitWidth - 1
+        const endRow = Math.floor(endBit / 8)
+        const endCol = endBit % 8
+
+        const x = startCol * cellSize
+        const y = startRow * cellSize
+        const w = (endCol + 1) * cellSize - startCol * cellSize
+        const h = (endRow - startRow + 1) * cellSize
+
+        rectangles.push({ x, y, w, h })
+      }
 
       return (
         <g key={`group-${group.id}`}>
-          <rect
-            x={x}
-            y={y}
-            width={w}
-            height={h}
-            fill={group.color + '08'}
-            stroke={group.color}
-            strokeWidth={2}
-            strokeDasharray="6 3"
-            rx={4}
-          />
-          {group.repeatCount != null && group.repeatCount > 0 && (
+          {rectangles.map((rect, i) => (
+            <rect
+              key={i}
+              x={rect.x}
+              y={rect.y}
+              width={rect.w}
+              height={rect.h}
+              fill={group.color + '08'}
+              stroke={group.color}
+              strokeWidth={2}
+              strokeDasharray={repeatCount > 1 ? "6 3" : "6 3"}
+              rx={4}
+            />
+          ))}
+          {group.repeatCount != null && group.repeatCount > 1 && (
             <text
-              x={x + w - 4}
-              y={y + 14}
+              x={rectangles[0].x + rectangles[0].w - 4}
+              y={rectangles[0].y + 14}
               textAnchor="end"
               fontSize={11}
               fontFamily="monospace"
@@ -115,8 +126,8 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
             </text>
           )}
           <text
-            x={x + 4}
-            y={y + 14}
+            x={rectangles[0].x + 4}
+            y={rectangles[0].y + 14}
             textAnchor="start"
             fontSize={10}
             fontFamily="monospace"
