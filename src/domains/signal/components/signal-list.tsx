@@ -6,9 +6,10 @@ interface SignalListProps {
   onEdit: () => void
   onEditGroup?: () => void
   filterTagIds?: string[]
+  readOnly?: boolean
 }
 
-export function SignalList({ onEdit, onEditGroup, filterTagIds = [] }: SignalListProps) {
+export function SignalList({ onEdit, onEditGroup, filterTagIds = [], readOnly = false }: SignalListProps) {
   const { activeMessageId, activeSignals, activeGroups, selectedSignalId, setSelectedSignal,
     selectedGroupId, setSelectedGroup, deleteSignal, deleteGroup, bitNumbering } = useMessageStore()
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -91,23 +92,27 @@ export function SignalList({ onEdit, onEditGroup, filterTagIds = [] }: SignalLis
             )}
           </div>
         )}
-        <button
-          className="text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          title="Edit"
-          onClick={(e) => { e.stopPropagation(); setSelectedSignal(signal.id); onEdit() }}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-        </button>
-        <button
-          className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          title="Delete"
-          onClick={(e) => {
-            e.stopPropagation()
-            if (confirm(`Delete "${signal.name}"?`)) deleteSignal(signal.id)
-          }}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-        </button>
+        {!readOnly && (
+          <button
+            className="text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            title="Edit"
+            onClick={(e) => { e.stopPropagation(); setSelectedSignal(signal.id); onEdit() }}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+          </button>
+        )}
+        {!readOnly && (
+          <button
+            className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            title="Delete"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (confirm(`Delete "${signal.name}"?`)) deleteSignal(signal.id)
+            }}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          </button>
+        )}
       </div>
     )
   }
@@ -149,7 +154,7 @@ export function SignalList({ onEdit, onEditGroup, filterTagIds = [] }: SignalLis
                   {group.repeatCount != null ? `x${group.repeatCount} · ` : ''}{group.bitWidth}b
                 </span>
               </div>
-              {onEditGroup && (
+              {onEditGroup && !readOnly && (
                 <button
                   className="text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                   title="Edit Group"
@@ -158,18 +163,20 @@ export function SignalList({ onEdit, onEditGroup, filterTagIds = [] }: SignalLis
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 </button>
               )}
-              <button
-                className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                title="Delete Group"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (confirm(`Delete group "${group.name}" and its ${members.length} signal(s)?`)) {
-                    deleteGroup(group.id)
-                  }
-                }}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              </button>
+              {!readOnly && (
+                <button
+                  className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                  title="Delete Group"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (confirm(`Delete group "${group.name}" and its ${members.length} signal(s)?`)) {
+                      deleteGroup(group.id)
+                    }
+                  }}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
+              )}
             </div>
 
             {/* Group member signals */}
