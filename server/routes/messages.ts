@@ -96,6 +96,7 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
       signalGroups?: Array<{
         name: string; description?: string; startBit: number; bitWidth: number;
         isRepeating?: boolean; color?: string; sortOrder?: number;
+        repeatCount?: number | null;
       }>;
     }>()
 
@@ -121,7 +122,7 @@ export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
               id: groupId, messageId, name: g.name, description: g.description ?? '',
               startBit: g.startBit, bitWidth: g.bitWidth,
               isRepeating: g.isRepeating ?? false,
-              repeatCount: null,
+              repeatCount: g.repeatCount ?? null,
               color: g.color ?? '#8B5CF6', sortOrder: g.sortOrder ?? i,
               createdAt: now, updatedAt: now,
             }).run()
