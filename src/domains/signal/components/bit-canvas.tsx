@@ -7,9 +7,10 @@ import { getBitLabel } from '@/foundation/lib/bit-position'
 
 interface BitCanvasProps {
   onBitSelection: (startBit: number, bitLength: number, groupId?: string | null) => void
+  readOnly?: boolean
 }
 
-export function BitCanvas({ onBitSelection }: BitCanvasProps) {
+export function BitCanvas({ onBitSelection, readOnly = false }: BitCanvasProps) {
   const { activeMessage, activeSignals, activeGroups, selectedSignalId, bitNumbering, setBitNumbering } = useMessageStore()
   const message = activeMessage
   const svgRef = useRef<SVGSVGElement>(null)
@@ -111,32 +112,34 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
               rx={4}
             />
           ))}
-          {group.repeatCount != null && group.repeatCount > 1 && (
-            <text
-              x={rectangles[0].x + rectangles[0].w - 4}
-              y={rectangles[0].y + 14}
-              textAnchor="end"
-              fontSize={11}
-              fontFamily="monospace"
-              fill={group.color}
-              fontWeight="bold"
-              style={{ pointerEvents: 'none' }}
-            >
-              x{group.repeatCount}
-            </text>
+          {group.repeatCount != null && group.repeatCount > 1 && rectangles[0] && (
+            <>
+              <text
+                x={rectangles[0].x + rectangles[0].w - 4}
+                y={rectangles[0].y + 14}
+                textAnchor="end"
+                fontSize={11}
+                fontFamily="monospace"
+                fill={group.color}
+                fontWeight="bold"
+                style={{ pointerEvents: 'none' }}
+              >
+                x{group.repeatCount}
+              </text>
+              <text
+                x={rectangles[0].x + 4}
+                y={rectangles[0].y + 14}
+                textAnchor="start"
+                fontSize={10}
+                fontFamily="monospace"
+                fill={group.color}
+                fontWeight="600"
+                style={{ pointerEvents: 'none' }}
+              >
+                {group.name}
+              </text>
+            </>
           )}
-          <text
-            x={rectangles[0].x + 4}
-            y={rectangles[0].y + 14}
-            textAnchor="start"
-            fontSize={10}
-            fontFamily="monospace"
-            fill={group.color}
-            fontWeight="600"
-            style={{ pointerEvents: 'none' }}
-          >
-            {group.name}
-          </text>
         </g>
       )
     })
@@ -187,9 +190,10 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
           ref={svgRef}
           width={width}
           height={height}
-          className="border border-gray-300 rounded cursor-crosshair"
+          className={`border border-gray-300 rounded ${readOnly ? 'cursor-default' : 'cursor-crosshair'}`}
           style={{ minWidth: width }}
           onMouseDown={(e) => {
+            if (readOnly) return
             e.preventDefault()
             const bit = getBitIndex(e.clientX, e.clientY)
             if (bit !== null) handleMouseDown(bit)
@@ -201,16 +205,18 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
             if (rect) {
               setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
             }
-            if (bit !== null) {
+            if (bit !== null && !readOnly) {
               const preview = handleMouseMove(bit)
               setDragPreview(preview)
             }
           }}
           onMouseUp={() => {
+            if (readOnly) return
             handleMouseUp()
             setDragPreview(null)
           }}
           onMouseLeave={() => {
+            if (readOnly) return
             setHoveredBit(null)
             setMousePos(null)
             setDragPreview(null)
@@ -345,7 +351,7 @@ export function BitCanvas({ onBitSelection }: BitCanvasProps) {
       </div>
 
       <div className="text-xs text-gray-400 mt-2 h-5">
-        {dragPreview
+        {readOnly ? null : dragPreview
           ? `Selected: B${Math.floor(dragPreview.startBit / 8)}:${getBitLabel(dragPreview.startBit % 8, bitNumbering)} — B${Math.floor((dragPreview.startBit + dragPreview.bitLength - 1) / 8)}:${getBitLabel((dragPreview.startBit + dragPreview.bitLength - 1) % 8, bitNumbering)} (${dragPreview.bitLength} bits)`
           : hoveredBit !== null
             ? (() => {
