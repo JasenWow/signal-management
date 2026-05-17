@@ -8,7 +8,10 @@ import com.smartcharge.flink.model.SignalDef;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Parses CAN frame hex strings using signal definitions from the signal management tool.
@@ -25,11 +28,65 @@ public class SignalParser {
     private final String messageName;
     private final int frameSize;
     private final List<SignalDef> signals;
+    private final Map<String, MessageSpec.SignalGroupDef> signalGroupsByName;
 
     public SignalParser(MessageSpec spec) {
         this.messageName = spec.getMessage().getName();
         this.frameSize = spec.getMessage().getFrameSize();
-        this.signals = spec.getSignals();
+        this.signalGroupsByName = buildGroupMap(spec.getSignalGroups());
+        this.signals = buildExpandedSignalList(spec.getSignals(), spec.getSignalGroups());
+    }
+
+    private Map<String, MessageSpec.SignalGroupDef> buildGroupMap(List<MessageSpec.SignalGroupDef> groups) {
+        Map<String, MessageSpec.SignalGroupDef> map = new HashMap<>();
+        if (groups != null) {
+            for (MessageSpec.SignalGroupDef group : groups) {
+                if (group.getName() != null) {
+                    map.put(group.getName(), group);
+                }
+            }
+        }
+        return map;
+    }
+
+    private List<SignalDef> buildExpandedSignalList(List<SignalDef> signals, List<MessageSpec.SignalGroupDef> groups) {
+        List<SignalDef> expanded = new ArrayList<>();
+        for (SignalDef signal : signals) {
+            String groupName = signal.getGroupName();
+            if (groupName != null) {
+                MessageSpec.SignalGroupDef group = signalGroupsByName.get(groupName);
+                if (group != null && group.getRepeatCount() != null && group.getRepeatCount() >= 2) {
+                    int repeatCount = group.getRepeatCount();
+                    int bitWidth = group.getBitWidth();
+                    for (int i = 1; i <= repeatCount; i++) {
+                        SignalDef copy = copySignal(signal);
+                        copy.setName(signal.getName() + "_" + i);
+                        copy.setStartBit(signal.getStartBit() + (i - 1) * bitWidth);
+                        expanded.add(copy);
+                    }
+                } else {
+                    expanded.add(signal);
+                }
+            } else {
+                expanded.add(signal);
+            }
+        }
+        return expanded;
+    }
+
+    private SignalDef copySignal(SignalDef original) {
+        SignalDef copy = new SignalDef();
+        copy.setName(original.getName());
+        copy.setDescription(original.getDescription());
+        copy.setStartBit(original.getStartBit());
+        copy.setBitLength(original.getBitLength());
+        copy.setByteOrder(original.getByteOrder());
+        copy.setFactor(original.getFactor());
+        copy.setOffset(original.getOffset());
+        copy.setUnit(original.getUnit());
+        copy.setDataType(original.getDataType());
+        copy.setGroupName(original.getGroupName());
+        return copy;
     }
 
     public static SignalParser fromFile(String path) throws IOException {

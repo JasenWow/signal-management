@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "message": {
+    "name": "TestRepeating",
+    "frameSize": 8,
+    "byteOrder": "big"
+  },
+  "signalGroups": [
+    {
+      "name": "CellVoltage",
+      "startBit": 0,
+      "bitWidth": 32,
+      "isRepeating": true,
+      "repeatCount": 2
+    }
+  ],
+  "signals": [
+    {
+      "name": "Voltage",
+      "groupName": "CellVoltage",
+      "startBit": 0,
+      "bitLength": 16
+    },
+    {
+      "name": "Temp",
+      "groupName": "CellVoltage",
+      "startBit": 16,
+      "bitLength": 8
+    },
+    {
+      "name": "Status",
+      "startBit": 56,
+      "bitLength": 8
+    }
+  ]
+}
