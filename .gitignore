@@ -5,3 +5,9 @@ data/*.db
 .vite
 data/*.db-shm
 data/*.db-wal
+
+# Maven/Java build output
+target/
+
+# Sisyphus tool state
+.sisyphus/

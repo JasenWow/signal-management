@@ -1,7 +1,0 @@
-/Volumes/data/documents/codes/signal-management/smart-charge-flink/src/main/java/com/smartcharge/flink/SmartChargeJob.java
-/Volumes/data/documents/codes/signal-management/smart-charge-flink/src/main/java/com/smartcharge/flink/function/ParseProcessFunction.java
-/Volumes/data/documents/codes/signal-management/smart-charge-flink/src/main/java/com/smartcharge/flink/model/MessageSpec.java
-/Volumes/data/documents/codes/signal-management/smart-charge-flink/src/main/java/com/smartcharge/flink/model/ParsedMessage.java
-/Volumes/data/documents/codes/signal-management/smart-charge-flink/src/main/java/com/smartcharge/flink/model/RawMessage.java
-/Volumes/data/documents/codes/signal-management/smart-charge-flink/src/main/java/com/smartcharge/flink/model/SignalDef.java
-/Volumes/data/documents/codes/signal-management/smart-charge-flink/src/main/java/com/smartcharge/flink/parser/SignalParser.java

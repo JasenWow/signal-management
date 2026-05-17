@@ -1,7 +1,0 @@
-=== Task 4: Tag CRUD API Routes ===
-
-GET /api/tags (empty): []
-POST /api/tags: Created tag with id, name='Test', color='#EF4444'
-GET /api/tags (after create): [tag object]
-
-SUCCESS: Tag CRUD operations work correctly
