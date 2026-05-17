@@ -78,36 +78,7 @@ const MIGRATIONS: { name: string; up: string }[] = [
     name: '002_tags_and_data_type',
     up: `ALTER TABLE signals ADD COLUMN data_type TEXT DEFAULT NULL;`,
   },
-  {
-    name: '003_signal_groups',
-    up: `
-      CREATE TABLE IF NOT EXISTS signal_groups (
-        id TEXT PRIMARY KEY, message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-        name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
-        start_bit INTEGER NOT NULL, bit_width INTEGER NOT NULL,
-        is_repeating INTEGER NOT NULL DEFAULT 0,
-        color TEXT NOT NULL DEFAULT '#8B5CF6',
-        sort_order INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-      ALTER TABLE signals ADD COLUMN group_id TEXT REFERENCES signal_groups(id) ON DELETE CASCADE;
-      CREATE INDEX IF NOT EXISTS idx_signal_groups_message ON signal_groups(message_id);
-      CREATE INDEX IF NOT EXISTS idx_signals_group ON signals(group_id);
-    `,
-  },
-  {
-    name: '004_absolute_coords_and_repeat_count',
-    up: `
-      UPDATE signals SET start_bit = start_bit + (
-        SELECT start_bit FROM signal_groups WHERE signal_groups.id = signals.group_id
-      ) WHERE group_id IS NOT NULL;
-      ALTER TABLE signal_groups ADD COLUMN repeat_count INTEGER DEFAULT NULL;
-    `,
-  },
-]
-
-export function runMigrations(db: BunSQLiteDatabase<typeof schema>, sqlite?: Database) {
+  export function runMigrations(db: BunSQLiteDatabase<typeof schema>, sqlite?: Database) {
   const raw = sqlite ?? (db as any).session?.client ?? (db as any).driver
   if (raw && typeof raw.exec === 'function') {
     raw.exec(SCHEMA_DDL)
