@@ -49,7 +49,7 @@ export default function signalGroupRoutes(db: BunSQLiteDatabase<typeof schema>) 
         and(
           eq(signalGroups.messageId, messageId),
           lt(signalGroups.startBit, rangeEnd + body.bitWidth),
-          gt(sql`${signalGroups.startBit} + ${signalGroups.bitWidth}`, body.startBit),
+          gt(sql`${signalGroups.startBit} + ${signalGroups.bitWidth} * coalesce(${signalGroups.repeatCount}, 1)`, body.startBit),
         )
       ).all()
 
@@ -128,7 +128,7 @@ export default function signalGroupRoutes(db: BunSQLiteDatabase<typeof schema>) 
             eq(signalGroups.messageId, existing.messageId),
             ne(signalGroups.id, id),
             lt(signalGroups.startBit, rangeEnd + bitWidth),
-            gt(sql`${signalGroups.startBit} + ${signalGroups.bitWidth}`, startBit),
+gt(sql`${signalGroups.startBit} + ${signalGroups.bitWidth} * coalesce(${signalGroups.repeatCount}, 1)`, startBit),
           )
         ).all()
 
@@ -200,7 +200,7 @@ export default function signalGroupRoutes(db: BunSQLiteDatabase<typeof schema>) 
           eq(signalGroups.messageId, group.messageId),
           ne(signalGroups.id, id),
           lt(signalGroups.startBit, rangeEnd + bitWidth),
-          gt(sql`${signalGroups.startBit} + ${signalGroups.bitWidth}`, startBit),
+          gt(sql`${signalGroups.startBit} + ${signalGroups.bitWidth} * coalesce(${signalGroups.repeatCount}, 1)`, startBit),
         )
       ).all()
 
