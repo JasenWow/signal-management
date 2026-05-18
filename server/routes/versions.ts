@@ -1,24 +1,13 @@
 import { Hono } from 'hono'
-import { eq, desc, sql, inArray } from 'drizzle-orm'
+import { eq, desc, inArray } from 'drizzle-orm'
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { randomUUID } from 'crypto'
 import * as jsondiffpatch from 'jsondiffpatch'
 import type { VersionSnapshot } from '../../src/foundation/types.js'
 import * as schema from '../db/schema.js'
+import { getSignalTags, getMessageTags } from '../lib/tag-helpers.js'
 
 const { messages, signals, valueTables, valueTableEntries, versions, tags, signalTags, messageTags } = schema
-
-function getSignalTags(db: BunSQLiteDatabase<typeof schema>, signalId: string) {
-  return db.select({ id: tags.id, name: tags.name, color: tags.color, createdAt: tags.createdAt, updatedAt: tags.updatedAt })
-    .from(tags).innerJoin(signalTags, eq(tags.id, signalTags.tagId))
-    .where(eq(signalTags.signalId, signalId)).all()
-}
-
-function getMessageTags(db: BunSQLiteDatabase<typeof schema>, messageId: string) {
-  return db.select({ id: tags.id, name: tags.name, color: tags.color, createdAt: tags.createdAt, updatedAt: tags.updatedAt })
-    .from(tags).innerJoin(messageTags, eq(tags.id, messageTags.tagId))
-    .where(eq(messageTags.messageId, messageId)).all()
-}
 
 function buildSnapshot(db: BunSQLiteDatabase<typeof schema>, messageId: string): VersionSnapshot {
   const msgRow = db.select().from(messages).where(eq(messages.id, messageId)).get()!
@@ -119,62 +108,66 @@ export default function versionRoutes(db: BunSQLiteDatabase<typeof schema>) {
 
     const now = new Date().toISOString()
 
-    db.update(messages).set({
-      name: snapshot.message.name, description: snapshot.message.description,
-      frameSize: snapshot.message.frameSize, byteOrder: snapshot.message.byteOrder,
-      updatedAt: now,
-    }).where(eq(messages.id, messageId)).run()
+    let newId: string
+    try {
+      db.transaction((tx) => {
+        tx.update(messages).set({
+          name: snapshot.message.name, description: snapshot.message.description,
+          frameSize: snapshot.message.frameSize, byteOrder: snapshot.message.byteOrder,
+          updatedAt: now,
+        }).where(eq(messages.id, messageId)).run()
 
-    // Delete signals first
-    db.delete(signals).where(eq(signals.messageId, messageId)).run()
+        tx.delete(signals).where(eq(signals.messageId, messageId)).run()
 
-    for (const s of snapshot.signals) {
-      db.insert(signals).values({
-        id: s.id, messageId, name: s.name, description: s.description,
-        startBit: s.startBit, bitLength: s.bitLength, byteOrder: s.byteOrder,
-        factor: s.factor, offset: s.offset, unit: s.unit,
-        minimum: s.minimum, maximum: s.maximum, valueTableId: s.valueTableId,
-        dataType: s.dataType ?? null, color: s.color,
-        sortOrder: s.sortOrder, createdAt: s.createdAt, updatedAt: now,
-      }).run()
+        for (const s of snapshot.signals) {
+          tx.insert(signals).values({
+            id: s.id, messageId, name: s.name, description: s.description,
+            startBit: s.startBit, bitLength: s.bitLength, byteOrder: s.byteOrder,
+            factor: s.factor, offset: s.offset, unit: s.unit,
+            minimum: s.minimum, maximum: s.maximum, valueTableId: s.valueTableId,
+            dataType: s.dataType ?? null, color: s.color,
+            sortOrder: s.sortOrder, createdAt: s.createdAt, updatedAt: now,
+          }).run()
+        }
+
+        const currentSignalIds = tx.select({ id: signals.id }).from(signals).where(eq(signals.messageId, messageId)).all().map(r => r.id)
+        if (currentSignalIds.length > 0) {
+          tx.delete(signalTags).where(inArray(signalTags.signalId, currentSignalIds)).run()
+        }
+        for (const st of snapshot.signalTags) {
+          for (const tag of st.tags) {
+            tx.insert(tags).values({ id: tag.id, name: tag.name, color: tag.color, createdAt: tag.createdAt, updatedAt: tag.updatedAt })
+              .onConflictDoNothing().run()
+            tx.insert(signalTags).values({ signalId: st.signalId, tagId: tag.id }).run()
+          }
+        }
+
+        tx.delete(messageTags).where(eq(messageTags.messageId, messageId)).run()
+        for (const tag of snapshot.messageTags) {
+          tx.insert(tags).values({ id: tag.id, name: tag.name, color: tag.color, createdAt: tag.createdAt, updatedAt: tag.updatedAt })
+            .onConflictDoNothing().run()
+          tx.insert(messageTags).values({ messageId, tagId: tag.id }).run()
+        }
+
+        newId = randomUUID()
+        const parent = tx.select({ id: versions.id })
+          .from(versions).where(eq(versions.messageId, messageId))
+          .orderBy(desc(versions.createdAt)).limit(1).get()
+
+        const currentSnapshot = buildSnapshot(db, messageId)
+        const diff = jsondiffpatch.diff(currentSnapshot, snapshot)
+
+        tx.insert(versions).values({
+          id: newId, messageId, parentId: parent?.id ?? null,
+          message: `Rollback to: ${row.message}`, snapshot: JSON.stringify(currentSnapshot),
+          diff: diff ? JSON.stringify(diff) : null, createdAt: now,
+        }).run()
+      })
+    } catch (err: any) {
+      return c.json({ error: 'Rollback failed', detail: err.message }, 500)
     }
 
-    // Restore signal tags
-    const currentSignalIds = db.select({ id: signals.id }).from(signals).where(eq(signals.messageId, messageId)).all().map(r => r.id)
-    if (currentSignalIds.length > 0) {
-      db.delete(signalTags).where(inArray(signalTags.signalId, currentSignalIds)).run()
-    }
-    for (const st of snapshot.signalTags) {
-      for (const tag of st.tags) {
-        db.insert(tags).values({ id: tag.id, name: tag.name, color: tag.color, createdAt: tag.createdAt, updatedAt: tag.updatedAt })
-          .onConflictDoNothing().run()
-        db.insert(signalTags).values({ signalId: st.signalId, tagId: tag.id }).run()
-      }
-    }
-
-    // Restore message tags
-    db.delete(messageTags).where(eq(messageTags.messageId, messageId)).run()
-    for (const tag of snapshot.messageTags) {
-      db.insert(tags).values({ id: tag.id, name: tag.name, color: tag.color, createdAt: tag.createdAt, updatedAt: tag.updatedAt })
-        .onConflictDoNothing().run()
-      db.insert(messageTags).values({ messageId, tagId: tag.id }).run()
-    }
-
-    const newId = randomUUID()
-    const parent = db.select({ id: versions.id })
-      .from(versions).where(eq(versions.messageId, messageId))
-      .orderBy(desc(versions.createdAt)).limit(1).get()
-
-    const currentSnapshot = buildSnapshot(db, messageId)
-    const diff = jsondiffpatch.diff(currentSnapshot, snapshot)
-
-    db.insert(versions).values({
-      id: newId, messageId, parentId: parent?.id ?? null,
-      message: `Rollback to: ${row.message}`, snapshot: JSON.stringify(currentSnapshot),
-      diff: diff ? JSON.stringify(diff) : null, createdAt: now,
-    }).run()
-
-    return c.json({ success: true, newVersionId: newId })
+    return c.json({ success: true, newVersionId: newId! })
   })
 
   return app

@@ -5,20 +5,9 @@ import { randomUUID } from 'crypto'
 import { generateSignalId } from '../../src/foundation/lib/signal-id.js'
 import type { CreateMessageInput, UpdateMessageInput } from '../../src/foundation/types.js'
 import * as schema from '../db/schema.js'
+import { getSignalTags, getMessageTags } from '../lib/tag-helpers.js'
 
-const { messages, signals, tags, signalTags, messageTags } = schema
-
-function getSignalTags(db: BunSQLiteDatabase<typeof schema>, signalId: string) {
-  return db.select({ id: tags.id, name: tags.name, color: tags.color, createdAt: tags.createdAt, updatedAt: tags.updatedAt })
-    .from(tags).innerJoin(signalTags, eq(tags.id, signalTags.tagId))
-    .where(eq(signalTags.signalId, signalId)).all()
-}
-
-function getMessageTags(db: BunSQLiteDatabase<typeof schema>, messageId: string) {
-  return db.select({ id: tags.id, name: tags.name, color: tags.color, createdAt: tags.createdAt, updatedAt: tags.updatedAt })
-    .from(tags).innerJoin(messageTags, eq(tags.id, messageTags.tagId))
-    .where(eq(messageTags.messageId, messageId)).all()
-}
+const { messages, signals } = schema
 
 export default function messageRoutes(db: BunSQLiteDatabase<typeof schema>) {
   const app = new Hono()

@@ -30,15 +30,19 @@ app.route('/api/tags', tagRoutes(db))
 // Serve static assets from dist/
 app.get('/assets/*', serveStatic({ root: './dist/' }))
 
+// Cache index.html at startup for SPA fallback
+let indexHtml: string | null = null
+try {
+  indexHtml = readFileSync('./dist/index.html', 'utf-8')
+} catch {
+  // dist/index.html may not exist during early development
+}
+
 // SPA fallback: all non-API GET requests serve index.html
 app.get('*', (c) => {
   if (c.req.path.startsWith('/api')) return c.notFound()
-  try {
-    const html = readFileSync('./dist/index.html', 'utf-8')
-    return c.html(html)
-  } catch {
-    return c.notFound()
-  }
+  if (!indexHtml) return c.notFound()
+  return c.html(indexHtml)
 })
 
 const port = 3002
