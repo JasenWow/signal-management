@@ -10,14 +10,10 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MessageSpec {
     private MessageInfo message;
-    private List<SignalGroupDef> signalGroups;
     private List<SignalDef> signals;
 
     public MessageInfo getMessage() { return message; }
     public void setMessage(MessageInfo message) { this.message = message; }
-
-    public List<SignalGroupDef> getSignalGroups() { return signalGroups; }
-    public void setSignalGroups(List<SignalGroupDef> signalGroups) { this.signalGroups = signalGroups; }
 
     public List<SignalDef> getSignals() { return signals; }
     public void setSignals(List<SignalDef> signals) { this.signals = signals; }
@@ -40,31 +36,5 @@ public class MessageSpec {
 
         public String getByteOrder() { return byteOrder; }
         public void setByteOrder(String byteOrder) { this.byteOrder = byteOrder; }
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class SignalGroupDef {
-        private String name;
-        private String description;
-        private int startBit;
-        private int bitWidth;
-        private boolean isRepeating;
-        private Integer repeatCount;
-        private List<SignalDef> signals;
-
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-
-        public int getStartBit() { return startBit; }
-        public void setStartBit(int startBit) { this.startBit = startBit; }
-
-        public int getBitWidth() { return bitWidth; }
-        public void setBitWidth(int bitWidth) { this.bitWidth = bitWidth; }
-
-        public Integer getRepeatCount() { return repeatCount; }
-        public void setRepeatCount(Integer repeatCount) { this.repeatCount = repeatCount; }
-
-        public List<SignalDef> getSignals() { return signals; }
-        public void setSignals(List<SignalDef> signals) { this.signals = signals; }
     }
 }

@@ -34,7 +34,6 @@ public class ParseProcessFunction extends ProcessFunction<String, ParsedMessage>
             ParsedMessage parsed = parser.parse(hexData.trim(), timestamp);
             out.collect(parsed);
         } catch (Exception e) {
-            // Log and skip malformed frames
             System.err.println("Failed to parse frame: " + hexData + " — " + e.getMessage());
         }
     }

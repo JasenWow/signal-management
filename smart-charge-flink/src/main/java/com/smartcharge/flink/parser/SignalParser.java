@@ -8,10 +8,7 @@ import com.smartcharge.flink.model.SignalDef;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Parses CAN frame hex strings using signal definitions from the signal management tool.
@@ -32,67 +29,7 @@ public class SignalParser {
     public SignalParser(MessageSpec spec) {
         this.messageName = spec.getMessage().getName();
         this.frameSize = spec.getMessage().getFrameSize();
-        this.signals = buildExpandedSignalList(spec.getSignals(), spec.getSignalGroups());
-    }
-
-    private List<SignalDef> buildExpandedSignalList(List<SignalDef> flatSignals, List<MessageSpec.SignalGroupDef> groups) {
-        List<SignalDef> expanded = new ArrayList<>();
-
-        // 1. Add non-grouped signals (from top-level, absolute startBit, no modification)
-        if (flatSignals != null) {
-            for (SignalDef signal : flatSignals) {
-                if (signal.getGroupName() == null) {
-                    expanded.add(signal);
-                }
-            }
-        }
-
-        // 2. Process signal groups (signals inside groups use relative startBit)
-        if (groups != null) {
-            for (MessageSpec.SignalGroupDef group : groups) {
-                List<SignalDef> groupSignals = group.getSignals();
-                if (groupSignals == null || groupSignals.isEmpty()) continue;
-
-                if (group.getRepeatCount() != null && group.getRepeatCount() >= 2) {
-                    // Repeating group: expand with suffixes and offset calculation
-                    int repeatCount = group.getRepeatCount();
-                    int bitWidth = group.getBitWidth();
-                    for (int i = 1; i <= repeatCount; i++) {
-                        for (SignalDef signal : groupSignals) {
-                            SignalDef copy = copySignal(signal);
-                            copy.setName(signal.getName() + "_" + i);
-                            // Absolute startBit = group.startBit + signal.relativeStartBit + (i-1) * group.bitWidth
-                            copy.setStartBit(group.getStartBit() + signal.getStartBit() + (i - 1) * bitWidth);
-                            expanded.add(copy);
-                        }
-                    }
-                } else {
-                    // Non-repeating group: convert relative → absolute startBit
-                    for (SignalDef signal : groupSignals) {
-                        SignalDef copy = copySignal(signal);
-                        copy.setStartBit(group.getStartBit() + signal.getStartBit());
-                        expanded.add(copy);
-                    }
-                }
-            }
-        }
-
-        return expanded;
-    }
-
-    private SignalDef copySignal(SignalDef original) {
-        SignalDef copy = new SignalDef();
-        copy.setName(original.getName());
-        copy.setDescription(original.getDescription());
-        copy.setStartBit(original.getStartBit());
-        copy.setBitLength(original.getBitLength());
-        copy.setByteOrder(original.getByteOrder());
-        copy.setFactor(original.getFactor());
-        copy.setOffset(original.getOffset());
-        copy.setUnit(original.getUnit());
-        copy.setDataType(original.getDataType());
-        copy.setGroupName(original.getGroupName());
-        return copy;
+        this.signals = spec.getSignals() != null ? spec.getSignals() : List.of();
     }
 
     public static SignalParser fromFile(String path) throws IOException {

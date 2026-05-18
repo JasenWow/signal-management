@@ -16,7 +16,6 @@ public class SignalDef {
     private double offset = 0.0;
     private String unit;
     private String dataType;
-    private String groupName;
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -44,9 +43,6 @@ public class SignalDef {
 
     public String getDataType() { return dataType; }
     public void setDataType(String dataType) { this.dataType = dataType; }
-
-    public String getGroupName() { return groupName; }
-    public void setGroupName(String groupName) { this.groupName = groupName; }
 
     public boolean isSigned() {
         return dataType != null && dataType.startsWith("int");
